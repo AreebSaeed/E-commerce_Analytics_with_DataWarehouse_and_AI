@@ -1,0 +1,7 @@
+# Local database credentials
+.env
+.env.*
+!.env.example
+
+# Raw source datasets
+/data/raw/

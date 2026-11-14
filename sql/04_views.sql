@@ -4,7 +4,7 @@ FROM dw.dim_order o LEFT JOIN (SELECT order_key,count(*) item_count,sum(price) i
 LEFT JOIN (SELECT order_key,sum(payment_value) payment_total FROM dw.fact_order_payments GROUP BY order_key) p USING(order_key);
 DROP MATERIALIZED VIEW IF EXISTS dw.mv_monthly_kpis;
 CREATE MATERIALIZED VIEW dw.mv_monthly_kpis AS
-SELECT date_trunc('month',purchase_timestamp)::date month,count(*) FILTER(WHERE order_status NOT IN ('canceled','unavailable')) order_count,sum(gmv) FILTER(WHERE order_status NOT IN ('canceled','unavailable')) gmv,avg(latest_review_score) avg_review_score,count(*) FILTER(WHERE is_on_time) on_time_orders,count(*) FILTER(WHERE is_delivered) delivered_orders
+SELECT date_trunc('month',purchase_timestamp)::date AS month,count(*) FILTER(WHERE order_status NOT IN ('canceled','unavailable')) order_count,sum(gmv) FILTER(WHERE order_status NOT IN ('canceled','unavailable')) gmv,avg(latest_review_score) avg_review_score,count(*) FILTER(WHERE is_on_time) on_time_orders,count(*) FILTER(WHERE is_delivered) delivered_orders
 FROM dw.v_order_metrics GROUP BY 1;
 CREATE UNIQUE INDEX ix_mv_monthly_kpis ON dw.mv_monthly_kpis(month);
 DROP MATERIALIZED VIEW IF EXISTS dw.mv_regional_metrics;

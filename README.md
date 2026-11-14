@@ -4,10 +4,14 @@ This project loads the Olist CSV files into a local PostgreSQL database. pgAdmin
 
 ## Load
 
+Connection settings are read from `.env` in the project folder. Set `PGPASSWORD` to your PostgreSQL server password, or leave it blank to be prompted. The defaults are host `localhost`, port `5432`, database `olist_dw`, and user `postgres`. The file is ignored by Git to keep local credentials out of commits. Values are literal; you may wrap a password in matching quotes. Command-line parameters override the corresponding `.env` settings.
+
+pgAdmin does not import this `.env` file. Use the same host, port, username, and password in its server connection settings, with `postgres` as the maintenance database. After loading, open the `olist_dw` database.
+
 All nine original CSV files are now in `data/raw`. In PowerShell, from this folder, run:
 
 ```powershell
-.\setup.ps1 -Database olist_dw -User postgres
+.\setup.ps1
 ```
 
 Enter the PostgreSQL password if prompted. The script creates `olist_dw`, builds the schema, loads the CSVs, transforms the data, and creates reporting views. It can be run again; warehouse tables are rebuilt from the raw files. If geolocation is absent, the load still works, but geographic coordinates and distance features remain empty.
