@@ -176,6 +176,8 @@ Normal setup also updates the reports automatically. For a refresh alone, run th
 
 For Power BI, select the `dw.v_*` reporting views. `v_regional_metrics` and `v_category_seller_metrics` expose the stored `mv_*` summaries as ordinary views, because the materialized views may not appear in Power BI's Navigator. Refresh the connection list after updating the reports.
 
+The three-page Power BI report and its reconciliation instructions are in [powerbi/README.md](powerbi/README.md).
+
 Financial summaries exclude canceled/unavailable orders and orphan facts. Delivery and review metrics include all real orders; the on-time denominator is delivered orders. AOV is eligible GMV divided by eligible orders, including orders with no items. Freight-to-price percentage is `100 * total freight / total item price`. Percentages use 0-100; a zero denominator returns NULL instead of a misleading percentage. Average installments are calculated per payment row.
 
 GMV and payment totals are different measures and need not match. Do not join item facts directly to payment facts. Do not sum distinct order counts across categories, sellers, or payment methods: an order can appear in several groups. Recalculate ratios from their totals when combining groups rather than averaging percentages.
