@@ -92,6 +92,10 @@ FROM meta.ml_runs WHERE model_name = 'kmeans'
 ORDER BY run_id DESC LIMIT 11;
 ```
 
+## TypeScript dashboard and prediction page
+
+The `web` folder contains a TypeScript dashboard and a **Try prediction** page. The prediction form calls a local Python server that loads the latest saved delivery model and displays its held-out test metrics. See [web/README.md](web/README.md) for the commands to build and run it.
+
 ## Python setup
 
 The local `.venv` is already prepared on this laptop. It uses a project-local Python runtime under `.tools`, so the MSYS Python on PATH is not needed. Both directories are ignored by Git. You do not need to activate the environment: `setup.ps1` selects its Python automatically.

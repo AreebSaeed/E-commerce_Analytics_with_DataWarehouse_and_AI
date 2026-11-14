@@ -2026,15 +2026,15 @@
   "risks": [
     {
       "label": "High",
-      "count": 28125
+      "count": 34559
     },
     {
       "label": "Low",
-      "count": 3800
+      "count": 2899
     },
     {
       "label": "Medium",
-      "count": 67516
+      "count": 61983
     }
   ],
   "segments": [

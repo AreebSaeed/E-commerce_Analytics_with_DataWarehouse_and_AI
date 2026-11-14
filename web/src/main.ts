@@ -1,4 +1,5 @@
 import './style.css'
+import { mountPredictor } from './prediction'
 
 type Month = { month: string; order_count: number; gmv: number; on_time_orders: number; delivered_orders: number }
 type Region = { year: number; state: string; order_count: number; gmv: number; avg_delivery_days: number | null }
@@ -10,7 +11,7 @@ type Snapshot = {
   monthly: Month[]; regional: Region[]; categories: Category[]; payments: Payment[]
   risks: Group[]; segments: Group[]
 }
-type Page = 'overview' | 'revenue' | 'operations' | 'intelligence'
+type Page = 'overview' | 'revenue' | 'operations' | 'intelligence' | 'predict'
 
 const app = document.querySelector<HTMLDivElement>('#app')!
 let data: Snapshot
@@ -32,6 +33,7 @@ function icon(name: string) {
     revenue: '<path d="M3 17l6-6 4 4 8-9"/><path d="M16 6h5v5"/>',
     operations: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 15l3-4 3 2 4-5"/>',
     brain: '<path d="M12 18V6m0 2a4 4 0 1 0-5 3m5-3a4 4 0 1 1 5 3M12 18a4 4 0 1 1-5-3m5 3a4 4 0 1 0 5-3"/>',
+    spark: '<path d="m12 3 1.7 6.3L20 11l-6.3 1.7L12 19l-1.7-6.3L4 11l6.3-1.7L12 3Z"/><path d="m19 18 .5 1.5L21 20l-1.5.5L19 22l-.5-1.5L17 20l1.5-.5L19 18Z"/>',
     arrow: '<path d="M5 12h14m-6-6 6 6-6 6"/>',
     download: '<path d="M12 3v12m-4-4 4 4 4-4M4 17v3h16v-3"/>',
   }
@@ -73,7 +75,7 @@ function selectedKpis() {
 }
 
 function nav() {
-  const items: [Page, string, string][] = [['overview', 'Overview', 'grid'], ['revenue', 'Revenue', 'revenue'], ['operations', 'Operations', 'operations'], ['intelligence', 'AI intelligence', 'brain']]
+  const items: [Page, string, string][] = [['overview', 'Overview', 'grid'], ['revenue', 'Revenue', 'revenue'], ['operations', 'Operations', 'operations'], ['intelligence', 'AI intelligence', 'brain'], ['predict', 'Try prediction', 'spark']]
   return `<aside class="sidebar">
     <div class="brand"><div class="brand-mark"><span></span><span></span><span></span><span></span></div><div><strong>olist<span>.</span></strong><small>COMMERCE STUDIO</small></div></div>
     <div class="workspace-label">WORKSPACE <span>01</span></div>
@@ -84,14 +86,14 @@ function nav() {
 
 function topbar() {
   const years = ['all', ...new Set(data.monthly.map(item => item.month.slice(0, 4)))].sort((a, b) => a === 'all' ? -1 : b === 'all' ? 1 : Number(b) - Number(a))
-  return `<header class="topbar"><div class="breadcrumb">Analytics <span>/</span> <strong>${page === 'intelligence' ? 'AI intelligence' : titleCase(page)}</strong></div>
-    <div class="top-actions">${page === 'intelligence' ? '<span class="snapshot-pill">All historical orders</span>' : `<div class="year-switch" role="group" aria-label="Filter by year">${years.map(item => `<button data-year="${item}" class="${year === item ? 'current' : ''}">${item === 'all' ? 'All time' : item}</button>`).join('')}</div>`}
-    <button class="export-button" data-export title="Download the current table as CSV">${icon('download')}<span>Export CSV</span></button></div></header>`
+  return `<header class="topbar"><div class="breadcrumb">Analytics <span>/</span> <strong>${page === 'intelligence' ? 'AI intelligence' : page === 'predict' ? 'Try prediction' : titleCase(page)}</strong></div>
+    <div class="top-actions">${page === 'intelligence' ? '<span class="snapshot-pill">All historical orders</span>' : page === 'predict' ? '<span class="snapshot-pill">Local saved model</span>' : `<div class="year-switch" role="group" aria-label="Filter by year">${years.map(item => `<button data-year="${item}" class="${year === item ? 'current' : ''}">${item === 'all' ? 'All time' : item}</button>`).join('')}</div>`}
+    ${page === 'predict' ? '' : `<button class="export-button" data-export title="Download the current table as CSV">${icon('download')}<span>Export CSV</span></button>`}</div></header>`
 }
 
 function hero() {
-  const subtitle = page === 'intelligence' ? 'Explore model outputs with the right context.' : page === 'operations' ? 'See where orders move, and where they slow down.' : page === 'revenue' ? 'Understand the shape of your sales.' : 'A clearer view of every order.'
-  const heading = page === 'intelligence' ? 'Customer intelligence' : page === 'operations' ? 'Delivery operations' : page === 'revenue' ? 'Revenue performance' : 'Your commerce, in focus.'
+  const subtitle = page === 'predict' ? 'Enter order details and see what the saved model estimates.' : page === 'intelligence' ? 'Explore model outputs with the right context.' : page === 'operations' ? 'See where orders move, and where they slow down.' : page === 'revenue' ? 'Understand the shape of your sales.' : 'A clearer view of every order.'
+  const heading = page === 'predict' ? 'Delivery risk predictor' : page === 'intelligence' ? 'Customer intelligence' : page === 'operations' ? 'Delivery operations' : page === 'revenue' ? 'Revenue performance' : 'Your commerce, in focus.'
   return `<section class="hero"><div class="hero-content"><div class="eyebrow light"><span></span> OLIST ANALYTICS / ${year === 'all' ? 'ALL YEARS' : year}</div><h1>${heading}</h1><p>${subtitle}</p><div class="hero-foot"><span class="hero-badge">●</span> Historical Olist data · 2016–2018</div></div><div class="hero-art" aria-hidden="true"><div class="orbit orbit-one"></div><div class="orbit orbit-two"></div><div class="orbit orbit-three"></div><div class="orb"></div><div class="art-bar art-one"></div><div class="art-bar art-two"></div><div class="art-bar art-three"></div></div></section>`
 }
 
@@ -156,7 +158,9 @@ function operationTrend() {
 }
 
 function render() {
-  const content = page === 'intelligence'
+  const content = page === 'predict'
+    ? '<div class="prediction-root"></div>'
+    : page === 'intelligence'
     ? `<div class="section-title"><div><span class="eyebrow">MODEL OUTPUTS</span><h2>Signals from the warehouse</h2></div><p>Explore the predictions and behavioral groups.</p></div><div class="content-grid ai-layout">${riskPanel()}${segmentsPanel()}</div>`
     : page === 'operations'
       ? `${kpiCards()}<div class="content-grid ops-layout">${operationTrend()}${regionalPanel(true)}</div>`
@@ -168,6 +172,8 @@ function render() {
   app.querySelectorAll<HTMLButtonElement>('[data-year]').forEach(button => button.addEventListener('click', () => { year = button.dataset.year!; render() }))
   app.querySelector<HTMLButtonElement>('[data-sort]')?.addEventListener('click', event => { regionSort = (event.currentTarget as HTMLButtonElement).dataset.sort as typeof regionSort; render() })
   app.querySelector<HTMLButtonElement>('[data-export]')?.addEventListener('click', exportCurrent)
+  const predictionRoot = app.querySelector<HTMLElement>('.prediction-root')
+  if (predictionRoot) void mountPredictor(predictionRoot)
 }
 
 function exportCurrent() {

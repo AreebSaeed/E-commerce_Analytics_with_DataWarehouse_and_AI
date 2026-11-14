@@ -1,0 +1,58 @@
+{
+  "version": "delivery_20261114_193154_515763",
+  "selected_model": "random_forest",
+  "feature_columns": [
+    "purchase_month",
+    "purchase_weekday",
+    "item_count",
+    "item_price",
+    "freight_value",
+    "total_weight_g",
+    "weight_known_items",
+    "total_volume_cm3",
+    "volume_known_items",
+    "seller_customer_distance_km",
+    "customer_state",
+    "seller_state"
+  ],
+  "train_rows": 67529,
+  "validation": {
+    "logistic_regression": {
+      "rows": 14470,
+      "late_rows": 773,
+      "precision": 0.09767718880285885,
+      "recall": 0.4243208279430789,
+      "f1": 0.158799322198015,
+      "tn": 10667,
+      "fp": 3030,
+      "fn": 445,
+      "tp": 328
+    },
+    "random_forest": {
+      "rows": 14470,
+      "late_rows": 773,
+      "precision": 0.09852365170231997,
+      "recall": 0.4230271668822768,
+      "f1": 0.1598240469208211,
+      "tn": 10705,
+      "fp": 2992,
+      "fn": 446,
+      "tp": 327
+    }
+  },
+  "test": {
+    "rows": 14471,
+    "late_rows": 957,
+    "precision": 0.04736080983369487,
+    "recall": 0.13688610240334378,
+    "f1": 0.0703733548213806,
+    "tn": 10879,
+    "fp": 2635,
+    "fn": 826,
+    "tp": 131
+  },
+  "scored_orders": 99441,
+  "threshold": 0.45000000000000007,
+  "training_cutoff": "2018-04-15 20:17:11",
+  "test_cutoff": "2018-06-21 08:41:07"
+}
