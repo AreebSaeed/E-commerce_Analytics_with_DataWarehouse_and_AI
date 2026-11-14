@@ -1,6 +1,6 @@
 # Olist data warehouse
 
-This project loads the Olist CSV files into a local PostgreSQL database. pgAdmin is the graphical client for viewing the resulting schemas, tables, and views. PostgreSQL 18 is installed on this laptop and its server was reachable during project setup.
+This project loads the Olist CSV files into a local PostgreSQL database. A small Python runner uses pandas and SQLAlchemy to load the CSVs, then runs the existing SQL transformations and reports through PostgreSQL's `psql` client. pgAdmin is the graphical client for exploring the resulting schemas, tables, and views.
 
 ## Load
 
@@ -14,13 +14,61 @@ All nine original CSV files are now in `data/raw`. In PowerShell, from this fold
 .\setup.ps1
 ```
 
-Enter the PostgreSQL password if prompted. The script creates `olist_dw`, builds the schema, loads the CSVs, transforms the data, and creates reporting views. It can be run again; warehouse tables are rebuilt from the raw files. If geolocation is absent, the load still works, but geographic coordinates and distance features remain empty.
+Enter the PostgreSQL password if prompted. `setup.ps1` is a short wrapper for `etl.py`. The runner creates `olist_dw` if needed, builds the schema, loads the CSVs, transforms the data, updates reporting views, and validates the result. It can be run again; warehouse tables are rebuilt from the raw files. If geolocation is absent, the load still works, but geographic coordinates and distance features remain empty. Run only one load or reporting refresh at a time.
 
 In pgAdmin, refresh Servers → PostgreSQL → Databases → `olist_dw`. Browse `staging`, `dw`, and `meta`. Start with `dw.v_order_metrics`, `dw.mv_monthly_kpis`, `dw.mv_regional_metrics`, and `meta.etl_log`.
 
 The facts have separate item and payment grains. Use `dw.v_order_metrics` for order-level financial reports to avoid multiplying amounts through joins. Financial summaries exclude canceled and unavailable orders; the base order view retains all statuses for auditing.
 
 The schema includes tables for ML predictions, but model training and Power BI reports are separate next stages. This initial load implements the warehouse and reporting foundation.
+
+## Python setup
+
+The local `.venv` is already prepared on this laptop. It uses a project-local Python runtime under `.tools`, so the MSYS Python on PATH is not needed. Both directories are ignored by Git. You do not need to activate the environment: `setup.ps1` selects its Python automatically.
+
+On another machine with standard Python 3.12 installed, create the environment once:
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+```
+
+PostgreSQL's `psql` must be on PATH or installed at `C:\Program Files\PostgreSQL\18\bin\psql.exe`. Copy the nine CSVs into `data/raw` and create `.env` with the connection settings described above.
+
+You can also run Python directly, which avoids PowerShell script execution-policy issues:
+
+```powershell
+.\.venv\Scripts\python.exe etl.py
+.\.venv\Scripts\python.exe etl.py --reports-only
+```
+
+The code follows six steps: check files, prepare the schema, load CSVs, transform the warehouse, refresh reports, and validate. pandas reads 50,000 rows at a time as strings, preserving postal-code zeros and UTF-8 reviews. SQLAlchemy manages the connection and transaction; the PostgreSQL driver uses COPY to load each chunk efficiently. All staging tables are loaded in one transaction, so a bad CSV rolls back the entire staging load.
+
+`sql/02_load.sql` remains an optional SQL-only loader for manual use; the Python runner does not call it. For audited runs, use `setup.ps1` or `etl.py`.
+
+## ETL audit log
+
+Each Python run inserts a `running` row in `meta.etl_log` before loading starts. It records `success` only after reports and validation finish. On an error, it records `failed`, the failed stage, completion time, and error message, and exits with a failure status. Existing history is retained; older rows may not have the new detail fields.
+
+```sql
+SELECT run_id, run_mode, started_at, completed_at,
+       completed_at - started_at AS duration,
+       status, stage, source_orders, loaded_orders, error_message
+FROM meta.etl_log
+ORDER BY run_id DESC LIMIT 10;
+
+SELECT row_counts, unknown_counts
+FROM meta.etl_log
+ORDER BY run_id DESC LIMIT 1;
+```
+
+`row_counts` records source and warehouse counts, excluding placeholder dimension rows. `unknown_counts` records real records that reference key `0`. On a failed run, available counts describe the database at failure time, not a successful load. The stages commit separately: an error in reporting does not undo an already completed warehouse transform. Fix the reported problem and rerun. Connection failures before audit storage is available are reported in the terminal; a forcibly terminated process can leave its log row marked `running`.
+
+Run the small Python tests with:
+
+```powershell
+.\.venv\Scripts\python.exe -m unittest discover -s tests -p "test_*.py" -v
+```
 
 ## Reporting
 

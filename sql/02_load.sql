@@ -1,4 +1,5 @@
 \set ON_ERROR_STOP on
+-- Optional manual SQL loader. Use etl.py for pandas loading and run audit logs.
 BEGIN;
 TRUNCATE staging.orders, staging.order_items, staging.order_payments, staging.order_reviews, staging.products, staging.customers, staging.sellers, staging.geolocation, staging.category_translation;
 COMMIT;
@@ -14,3 +15,5 @@ COMMIT;
 \copy staging.geolocation FROM 'data/raw/olist_geolocation_dataset.csv' WITH (FORMAT csv, HEADER true, ENCODING 'UTF8')
 \endif
 \i sql/03_transform.sql
+\ir 04_views.sql
+\ir 05_validate.sql

@@ -5,3 +5,9 @@
 
 # Raw source datasets
 /data/raw/
+
+# Local Python environment and downloaded tooling
+/.venv/
+/.tools/
+__pycache__/
+*.pyc

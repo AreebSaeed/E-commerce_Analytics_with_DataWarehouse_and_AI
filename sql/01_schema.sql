@@ -31,7 +31,7 @@ CREATE TABLE IF NOT EXISTS dw.fact_order_payments (payment_key bigint GENERATED 
 CREATE INDEX IF NOT EXISTS ix_payments_order ON dw.fact_order_payments(order_key);
 CREATE TABLE IF NOT EXISTS dw.ml_order_risk_scores (order_id text PRIMARY KEY, late_probability numeric(8,6), predicted_late boolean, risk_band text, model_version text, scored_at timestamptz DEFAULT now());
 CREATE TABLE IF NOT EXISTS dw.ml_customer_segments (customer_unique_id text PRIMARY KEY, cluster_id integer, segment_label text, model_version text, scored_at timestamptz DEFAULT now());
-CREATE TABLE IF NOT EXISTS meta.etl_log (run_id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY, started_at timestamptz DEFAULT now(), completed_at timestamptz, status text, source_orders bigint, loaded_orders bigint, loaded_items bigint, loaded_payments bigint, notes text);
+\ir 00_audit.sql
 CREATE TABLE IF NOT EXISTS meta.data_dictionary (metric_name text PRIMARY KEY, definition text NOT NULL);
 CREATE TABLE IF NOT EXISTS meta.ml_runs (run_id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY, model_name text, run_at timestamptz DEFAULT now(), sample_size integer, metric_name text, metric_value numeric, notes text);
 

@@ -114,8 +114,3 @@ INSERT INTO meta.data_dictionary VALUES
  ('Macro department','Project-defined category grouping from meta.category_departments. Missing category = Unknown; unmapped nonblank category = Other.'),
  ('Orphan facts','Source order IDs preserve item/payment grain when order_key = 0. Included in fact reconciliation but excluded from order-level reporting until the order exists.')
 ON CONFLICT(metric_name) DO UPDATE SET definition=excluded.definition;
-INSERT INTO meta.etl_log(completed_at,status,source_orders,loaded_orders,loaded_items,loaded_payments,notes)
-SELECT now(),'success',(SELECT count(*) FROM staging.orders),
-    (SELECT count(*) FROM dw.dim_order WHERE order_key<>0),
-    (SELECT count(*) FROM dw.fact_order_items),(SELECT count(*) FROM dw.fact_order_payments),
-    CASE WHEN (SELECT count(*) FROM staging.geolocation)=0 THEN 'Geolocation file absent' ELSE NULL END;
