@@ -1,5 +1,7 @@
 -- Called inside a transaction by 03_transform.sql and the rollback-only tests.
-TRUNCATE dw.fact_order_items, dw.fact_order_payments, dw.dim_order,
+-- Rebuilt features invalidate predictions from an earlier warehouse snapshot.
+TRUNCATE dw.ml_order_risk_scores, dw.ml_customer_segments,
+    dw.fact_order_items, dw.fact_order_payments, dw.dim_order,
     dw.dim_customer, dw.dim_seller, dw.dim_product, dw.dim_product_category,
     dw.dim_geolocation, dw.dim_date RESTART IDENTITY CASCADE;
 \ir category_departments.sql

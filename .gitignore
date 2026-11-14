@@ -11,3 +11,6 @@
 /.tools/
 __pycache__/
 *.pyc
+
+# Trained models are generated from the local warehouse
+/models/*.joblib

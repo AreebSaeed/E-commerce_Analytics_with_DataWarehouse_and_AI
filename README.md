@@ -20,7 +20,7 @@ In pgAdmin, refresh Servers → PostgreSQL → Databases → `olist_dw`. Browse 
 
 The facts have separate item and payment grains. Use `dw.v_order_metrics` for order-level financial reports to avoid multiplying amounts through joins. Financial summaries exclude canceled and unavailable orders; the base order view retains all statuses for auditing.
 
-The schema includes tables for ML predictions, but model training and Power BI reports are separate next stages. This initial load implements the warehouse and reporting foundation.
+The late-delivery model is implemented; customer segmentation and Power BI reports remain separate next stages.
 
 ## Machine learning feature datasets
 
@@ -44,7 +44,29 @@ SELECT * FROM dw.v_customer_features LIMIT 10;
 
 For orders with several sellers, the seller with the highest item total supplies the representative state and distance; ties use seller key. The distance uses the average coordinates for each postal prefix and the Haversine formula. Missing or clearly out-of-range coordinates produce NULL, not a fabricated distance. The broad screening box is latitude -34 to 6 and longitude -74 to -34, based on [IBGE's published extreme points of Brazil](https://www.ibge.gov.br/biblioteca/visualizacao/periodicos/2/bn_2023_v31_art02.pdf). This box rejects obvious errors but is not a precise border or state check. Product totals sum known item measurements; `weight_known_items` and `volume_known_items` show how many measurements contributed, so incomplete totals can be identified.
 
-Customer recency uses the latest eligible purchase date in this historical dataset as its reference date. Frequency and GMV include only orders with a purchase timestamp and exclude canceled/unavailable orders. Buyers with no eligible purchases have zero frequency/GMV and NULL recency; missing review or delay information stays NULL. Step 5 will decide how to fill missing values, scale features, and split training data; Step 4 only prepares accurate feature rows.
+Customer recency uses the latest eligible purchase date in this historical dataset as its reference date. Frequency and GMV include only orders with a purchase timestamp and exclude canceled/unavailable orders. Buyers with no eligible purchases have zero frequency/GMV and NULL recency; missing review or delay information stays NULL. The delivery training script handles missing purchase-time inputs inside its model pipeline. Customer segmentation will handle its own missing values in Step 6.
+
+## Train the late-delivery model
+
+After loading the warehouse, run:
+
+```powershell
+.\.venv\Scripts\python.exe train_delivery.py
+```
+
+The script trains Logistic Regression and Random Forest using only the columns listed in `train_delivery.py`. Orders are divided by purchase time into an earlier training period (about 70%), a later validation period (about 15%), and the latest test period (about 15%). It fits missing-value rules, state encoding, and scaling on training data only. It compares both models and decision cutoffs on validation F1, refits the selected model on training plus validation, and evaluates it once on the untouched test period. F1 summarizes precision and recall for the late class; the script also prints the four confusion-matrix counts. These periods are [ordered in time to avoid training on later examples than the ones used for evaluation](https://scikit-learn.org/stable/modules/cross_validation.html).
+
+The selected pipeline is saved under `models/` as a `.joblib` file, and its metrics are saved in a neighboring `.json` file. The binary model is ignored by Git and must be regenerated on another machine. The script writes one row per real order into `dw.ml_order_risk_scores` and records validation/test metrics in `meta.ml_runs`. Score replacement and metric inserts occur in one database transaction. Risk bands are based on the validation-selected cutoff: `High` is at or above it, `Medium` is between half the cutoff and the cutoff, and `Low` is below half. These are heuristic bands around an **uncalibrated model score**, not verified delivery probabilities.
+
+The held-out test on this dataset is weak: the selected Random Forest reached precision **0.047**, recall **0.137**, and F1 **0.070** (131 correctly flagged late orders, 2,635 false alarms, and 826 missed late orders). Use the scores as a learning result, not an operational delivery promise. A full warehouse rebuild clears previous predictions because they may refer to old data; run the training command again afterward. A reporting-only refresh leaves predictions intact. The held-out test metrics are separate from the scores written for all historical orders; many of those rows were used to train the model.
+
+Inspect the results in pgAdmin:
+
+```sql
+SELECT risk_band, count(*) FROM dw.ml_order_risk_scores GROUP BY risk_band;
+SELECT model_name, metric_name, metric_value, notes
+FROM meta.ml_runs ORDER BY run_id DESC LIMIT 14;
+```
 
 ## Python setup
 
