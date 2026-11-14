@@ -34,3 +34,22 @@ CREATE TABLE IF NOT EXISTS dw.ml_customer_segments (customer_unique_id text PRIM
 CREATE TABLE IF NOT EXISTS meta.etl_log (run_id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY, started_at timestamptz DEFAULT now(), completed_at timestamptz, status text, source_orders bigint, loaded_orders bigint, loaded_items bigint, loaded_payments bigint, notes text);
 CREATE TABLE IF NOT EXISTS meta.data_dictionary (metric_name text PRIMARY KEY, definition text NOT NULL);
 CREATE TABLE IF NOT EXISTS meta.ml_runs (run_id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY, model_name text, run_at timestamptz DEFAULT now(), sample_size integer, metric_name text, metric_value numeric, notes text);
+
+-- Upgrade existing warehouses as well as fresh installations.
+ALTER TABLE dw.dim_product_category ADD COLUMN IF NOT EXISTS macro_department text NOT NULL DEFAULT 'Other';
+CREATE TABLE IF NOT EXISTS meta.category_departments (
+    category_name_pt text PRIMARY KEY,
+    macro_department text NOT NULL CHECK (btrim(macro_department) <> '')
+);
+
+-- Preserve source grain when multiple missing orders map to order_key = 0.
+ALTER TABLE dw.fact_order_items ADD COLUMN IF NOT EXISTS source_order_id text;
+ALTER TABLE dw.fact_order_payments ADD COLUMN IF NOT EXISTS source_order_id text;
+UPDATE dw.fact_order_items f SET source_order_id = o.order_id
+FROM dw.dim_order o WHERE f.order_key = o.order_key AND f.source_order_id IS NULL;
+UPDATE dw.fact_order_payments f SET source_order_id = o.order_id
+FROM dw.dim_order o WHERE f.order_key = o.order_key AND f.source_order_id IS NULL;
+ALTER TABLE dw.fact_order_items DROP CONSTRAINT IF EXISTS fact_order_items_order_key_order_item_id_key;
+ALTER TABLE dw.fact_order_payments DROP CONSTRAINT IF EXISTS fact_order_payments_order_key_payment_sequential_key;
+CREATE UNIQUE INDEX IF NOT EXISTS ix_items_source_grain ON dw.fact_order_items(source_order_id, order_item_id);
+CREATE UNIQUE INDEX IF NOT EXISTS ix_payments_source_grain ON dw.fact_order_payments(source_order_id, payment_sequential);
