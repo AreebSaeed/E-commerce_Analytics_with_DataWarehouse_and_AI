@@ -20,7 +20,7 @@ In pgAdmin, refresh Servers → PostgreSQL → Databases → `olist_dw`. Browse 
 
 The facts have separate item and payment grains. Use `dw.v_order_metrics` for order-level financial reports to avoid multiplying amounts through joins. Financial summaries exclude canceled and unavailable orders; the base order view retains all statuses for auditing.
 
-The late-delivery model is implemented; customer segmentation and Power BI reports remain separate next stages.
+The late-delivery model and customer segmentation are implemented; Power BI reports remain a separate next stage.
 
 ## Machine learning feature datasets
 
@@ -44,7 +44,7 @@ SELECT * FROM dw.v_customer_features LIMIT 10;
 
 For orders with several sellers, the seller with the highest item total supplies the representative state and distance; ties use seller key. The distance uses the average coordinates for each postal prefix and the Haversine formula. Missing or clearly out-of-range coordinates produce NULL, not a fabricated distance. The broad screening box is latitude -34 to 6 and longitude -74 to -34, based on [IBGE's published extreme points of Brazil](https://www.ibge.gov.br/biblioteca/visualizacao/periodicos/2/bn_2023_v31_art02.pdf). This box rejects obvious errors but is not a precise border or state check. Product totals sum known item measurements; `weight_known_items` and `volume_known_items` show how many measurements contributed, so incomplete totals can be identified.
 
-Customer recency uses the latest eligible purchase date in this historical dataset as its reference date. Frequency and GMV include only orders with a purchase timestamp and exclude canceled/unavailable orders. Buyers with no eligible purchases have zero frequency/GMV and NULL recency; missing review or delay information stays NULL. The delivery training script handles missing purchase-time inputs inside its model pipeline. Customer segmentation will handle its own missing values in Step 6.
+Customer recency uses the latest eligible purchase date in this historical dataset as its reference date. Frequency and GMV include only orders with a purchase timestamp and exclude canceled/unavailable orders. Buyers with no eligible purchases have zero frequency/GMV and NULL recency; missing review or delay information stays NULL. The two model scripts handle missing input values separately.
 
 ## Train the late-delivery model
 
@@ -58,7 +58,7 @@ The script trains Logistic Regression and Random Forest using only the columns l
 
 The selected pipeline is saved under `models/` as a `.joblib` file, and its metrics are saved in a neighboring `.json` file. The binary model is ignored by Git and must be regenerated on another machine. The script writes one row per real order into `dw.ml_order_risk_scores` and records validation/test metrics in `meta.ml_runs`. Score replacement and metric inserts occur in one database transaction. Risk bands are based on the validation-selected cutoff: `High` is at or above it, `Medium` is between half the cutoff and the cutoff, and `Low` is below half. These are heuristic bands around an **uncalibrated model score**, not verified delivery probabilities.
 
-The held-out test on this dataset is weak: the selected Random Forest reached precision **0.047**, recall **0.137**, and F1 **0.070** (131 correctly flagged late orders, 2,635 false alarms, and 826 missed late orders). Use the scores as a learning result, not an operational delivery promise. A full warehouse rebuild clears previous predictions because they may refer to old data; run the training command again afterward. A reporting-only refresh leaves predictions intact. The held-out test metrics are separate from the scores written for all historical orders; many of those rows were used to train the model.
+The held-out test on this dataset is weak: the selected Random Forest reached precision **0.047**, recall **0.137**, and F1 **0.070** (131 correctly flagged late orders, 2,635 false alarms, and 826 missed late orders). Use the scores as a learning result, not an operational delivery promise. A full warehouse rebuild clears previous predictions and customer segments because they may refer to old data; rerun both model scripts afterward. A reporting-only refresh leaves model outputs intact. The held-out test metrics are separate from the scores written for all historical orders; many of those rows were used to train the model.
 
 Inspect the results in pgAdmin:
 
@@ -66,6 +66,30 @@ Inspect the results in pgAdmin:
 SELECT risk_band, count(*) FROM dw.ml_order_risk_scores GROUP BY risk_band;
 SELECT model_name, metric_name, metric_value, notes
 FROM meta.ml_runs ORDER BY run_id DESC LIMIT 14;
+```
+
+## Segment customers
+
+After loading the warehouse, run:
+
+```powershell
+.\.venv\Scripts\python.exe segment_customers.py
+```
+
+The script groups customers using recency, order frequency, log-transformed GMV, average review score, and average delivery delay from `dw.v_customer_features`. It fills missing review/delay values with their medians, limits extreme inputs to the 1st and 99th percentiles, and standardizes all five inputs before K-Means. It fits k=2 through k=8 on all buyers with eligible orders and compares their [silhouette scores](https://scikit-learn.org/stable/modules/generated/sklearn.metrics.silhouette_score.html) on a fixed random sample of 2,000 for a quick, reproducible selection. No eligible purchase means recency is undefined, so those buyers receive cluster `-1` and the label `No eligible purchases` rather than a fabricated recency value.
+
+The selected model and its input transformations are saved under `models/`; a JSON file records scores and cluster profiles. One row per permanent buyer ID is written to `dw.ml_customer_segments`, and the silhouette scores, chosen k, and cluster sizes are logged in `meta.ml_runs`. The write is one database transaction. Names describe observed median spending, repeat activity, recency, and delay; they are descriptive groups, not proven loyalty or churn predictions.
+
+On this dataset, k=2 had the highest sampled silhouette (**0.602**). It grouped **92,102 one-time lower-spend buyers** and **2,888 higher-spend repeat buyers**. Another **1,106 buyers** had no eligible purchase and were assigned cluster `-1`. Cluster numbers and names can change when data changes; use the saved version and profile rather than assuming cluster `0` always means the same thing.
+
+```sql
+SELECT cluster_id, segment_label, count(*) AS customers
+FROM dw.ml_customer_segments
+GROUP BY cluster_id, segment_label ORDER BY cluster_id;
+
+SELECT metric_name, metric_value, notes
+FROM meta.ml_runs WHERE model_name = 'kmeans'
+ORDER BY run_id DESC LIMIT 11;
 ```
 
 ## Python setup
