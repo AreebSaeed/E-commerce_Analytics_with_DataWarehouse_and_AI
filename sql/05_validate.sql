@@ -8,7 +8,12 @@ UNION ALL SELECT 'customers',(SELECT count(*) FROM staging.customers),(SELECT co
 UNION ALL SELECT 'sellers',(SELECT count(*) FROM staging.sellers),(SELECT count(*) FROM dw.dim_seller WHERE seller_key<>0)
 UNION ALL SELECT 'products',(SELECT count(*) FROM staging.products),(SELECT count(*) FROM dw.dim_product WHERE product_key<>0)
 UNION ALL SELECT 'categories',(SELECT count(DISTINCT nullif(btrim(product_category_name),'')) FROM staging.products),(SELECT count(*) FROM dw.dim_product_category WHERE category_key<>0)
-UNION ALL SELECT 'order reporting',(SELECT count(*) FROM staging.orders),(SELECT count(*) FROM dw.v_order_metrics);
+UNION ALL SELECT 'order reporting',(SELECT count(*) FROM staging.orders),(SELECT count(*) FROM dw.v_order_metrics)
+UNION ALL SELECT 'delivery features',(SELECT count(*) FROM staging.orders),(SELECT count(*) FROM dw.v_delivery_features)
+UNION ALL SELECT 'customer features',
+    (SELECT count(DISTINCT customer_unique_id) FROM dw.dim_customer
+      WHERE customer_key<>0 AND nullif(btrim(customer_unique_id),'') IS NOT NULL),
+    (SELECT count(*) FROM dw.v_customer_features);
 
 CREATE TEMP TABLE warehouse_money_checks AS
 SELECT 'item price' AS metric,

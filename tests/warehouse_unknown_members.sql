@@ -13,9 +13,13 @@ INSERT INTO staging.customers VALUES
 INSERT INTO staging.sellers VALUES
     ('seller-known','01234','test city','SP'),
     ('seller-no-geo',NULL,'remote city','RJ');
-INSERT INTO staging.products(product_id,product_category_name) VALUES
-    ('product-known','beleza_saude'),('product-null',NULL),('product-blank','   '),
-    ('product-untranslated','pc_gamer'),('product-new','new_unmapped_category');
+INSERT INTO staging.products(product_id,product_category_name,product_weight_g,
+    product_length_cm,product_height_cm,product_width_cm) VALUES
+    ('product-known','beleza_saude','100','2','3','4'),
+    ('product-null',NULL,NULL,NULL,NULL,NULL),
+    ('product-blank','   ',NULL,NULL,NULL,NULL),
+    ('product-untranslated','pc_gamer',NULL,NULL,NULL,NULL),
+    ('product-new','new_unmapped_category',NULL,NULL,NULL,NULL);
 INSERT INTO staging.category_translation VALUES ('beleza_saude','health_beauty');
 INSERT INTO staging.orders(order_id,customer_id,order_status,order_purchase_timestamp,
     order_delivered_customer_date,order_estimated_delivery_date) VALUES
@@ -116,6 +120,57 @@ BEGIN
         RAISE EXCEPTION 'Category/seller grain or zero-price ratio failed';
     END IF;
 END $$;
+
+-- Feature grain, purchase-time inputs, distance fallback, and separate label.
+DO $$
+BEGIN
+    IF (SELECT count(*) FROM dw.v_delivery_features)<>6
+       OR (SELECT count(*) FROM dw.v_delivery_training)<>1
+       OR NOT EXISTS (SELECT 1 FROM dw.v_delivery_training
+            WHERE order_id='order-known' AND label_is_late=false) THEN
+        RAISE EXCEPTION 'Delivery feature grain or observed-label rule failed';
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM dw.v_delivery_features
+        WHERE order_id='order-known' AND item_count=2 AND item_price=30
+          AND freight_value=5 AND total_weight_g=100 AND weight_known_items=1
+          AND total_volume_cm3=24 AND volume_known_items=1
+          AND seller_state='RJ' AND seller_customer_distance_km IS NULL)
+       OR NOT EXISTS (SELECT 1 FROM dw.v_delivery_features
+        WHERE order_id='order-zero' AND seller_customer_distance_km=0)
+       OR NOT EXISTS (SELECT 1 FROM dw.v_delivery_features
+        WHERE order_id='order-no-customer' AND customer_state='Unknown') THEN
+        RAISE EXCEPTION 'Purchase-time aggregates or location fallback failed';
+    END IF;
+    IF EXISTS (SELECT 1 FROM information_schema.columns
+        WHERE table_schema='dw' AND table_name='v_delivery_features'
+          AND column_name IN ('label_is_late','delivered_timestamp','estimated_delivery_timestamp',
+                              'latest_review_score','delivery_delay_days','order_status')) THEN
+        RAISE EXCEPTION 'Outcome or review leaked into prediction features';
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM dw.v_customer_features
+        WHERE customer_unique_id='buyer-known' AND frequency_orders=2
+          AND monetary_gmv=35 AND avg_review_score=5
+          AND avg_delivery_delay_days=-1
+          AND as_of_date=date '2025-01-01'
+          AND recency_days=as_of_date-last_purchase_date)
+       OR (SELECT count(*) FROM dw.v_customer_features)<>2 THEN
+        RAISE EXCEPTION 'Customer RFM grain or cohort measures failed';
+    END IF;
+END $$;
+
+-- Reject a clearly incorrect coordinate without inventing a distance.
+INSERT INTO dw.dim_geolocation(zip_prefix,latitude,longitude)
+VALUES ('bad-point',42,-8);
+UPDATE dw.dim_customer SET geo_key=(SELECT geo_key FROM dw.dim_geolocation WHERE zip_prefix='bad-point')
+WHERE customer_id='customer-known';
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM dw.v_delivery_features WHERE order_id='order-zero'
+        AND seller_customer_distance_km IS NULL) THEN
+        RAISE EXCEPTION 'Out-of-range coordinates produced a distance';
+    END IF;
+END $$;
+UPDATE dw.dim_customer SET geo_key=(SELECT geo_key FROM dw.dim_geolocation WHERE zip_prefix='01234')
+WHERE customer_id='customer-known';
 
 -- Change an amount, refresh the stored reports, and prove they were not recreated.
 CREATE TEMP TABLE report_objects AS

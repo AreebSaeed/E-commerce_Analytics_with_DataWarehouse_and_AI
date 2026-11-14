@@ -22,6 +22,30 @@ The facts have separate item and payment grains. Use `dw.v_order_metrics` for or
 
 The schema includes tables for ML predictions, but model training and Power BI reports are separate next stages. This initial load implements the warehouse and reporting foundation.
 
+## Machine learning feature datasets
+
+Step 4 is provided by three SQL views. They update automatically when the warehouse is rebuilt; no separate export is required.
+
+| View | Grain and purpose |
+| --- | --- |
+| `dw.v_delivery_features` | One row per real order. Purchase-time inputs for a future late-delivery model: month and weekday, customer and seller state, item count, price, freight, product weight/volume, and seller-to-customer distance in km. |
+| `dw.v_delivery_training` | Delivered orders with an estimated delivery date and purchase time. Adds `label_is_late` for model training and evaluation. |
+| `dw.v_customer_features` | One row per permanent `customer_unique_id`: recency, frequency, GMV, log GMV, average review score, and average delivery delay. |
+
+Preview them in pgAdmin:
+
+```sql
+SELECT * FROM dw.v_delivery_features LIMIT 10;
+SELECT * FROM dw.v_delivery_training LIMIT 10;
+SELECT * FROM dw.v_customer_features LIMIT 10;
+```
+
+`v_delivery_features` contains no actual delivery date, review score, order status, or late-delivery label. `purchase_timestamp` and `order_id` identify and chronologically split records; they should not be fed directly to a model as predictors. The label is only in `v_delivery_training`, and a future training script must remove it from the input columns. Undelivered, canceled, unavailable, and unestimable orders have no observed training label. A future model can score rows from `v_delivery_features`, including orders without outcomes.
+
+For orders with several sellers, the seller with the highest item total supplies the representative state and distance; ties use seller key. The distance uses the average coordinates for each postal prefix and the Haversine formula. Missing or clearly out-of-range coordinates produce NULL, not a fabricated distance. The broad screening box is latitude -34 to 6 and longitude -74 to -34, based on [IBGE's published extreme points of Brazil](https://www.ibge.gov.br/biblioteca/visualizacao/periodicos/2/bn_2023_v31_art02.pdf). This box rejects obvious errors but is not a precise border or state check. Product totals sum known item measurements; `weight_known_items` and `volume_known_items` show how many measurements contributed, so incomplete totals can be identified.
+
+Customer recency uses the latest eligible purchase date in this historical dataset as its reference date. Frequency and GMV include only orders with a purchase timestamp and exclude canceled/unavailable orders. Buyers with no eligible purchases have zero frequency/GMV and NULL recency; missing review or delay information stays NULL. Step 5 will decide how to fill missing values, scale features, and split training data; Step 4 only prepares accurate feature rows.
+
 ## Python setup
 
 The local `.venv` is already prepared on this laptop. It uses a project-local Python runtime under `.tools`, so the MSYS Python on PATH is not needed. Both directories are ignored by Git. You do not need to activate the environment: `setup.ps1` selects its Python automatically.

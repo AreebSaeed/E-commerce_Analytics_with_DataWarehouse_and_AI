@@ -114,3 +114,4 @@ INSERT INTO meta.data_dictionary VALUES
 ON CONFLICT(metric_name) DO UPDATE SET definition=excluded.definition;
 
 \ir 06_refresh_views.sql
+\ir 07_ml_features.sql
