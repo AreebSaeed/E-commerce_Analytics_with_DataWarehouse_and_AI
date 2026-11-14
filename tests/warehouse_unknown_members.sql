@@ -23,7 +23,8 @@ INSERT INTO staging.orders(order_id,customer_id,order_status,order_purchase_time
     ('order-no-customer','missing-customer','shipped','2018-01-02',NULL,'2018-01-08'),
     ('order-no-dates','customer-no-geo','created',NULL,'',''),
     ('order-outside-calendar',NULL,'created','2025-01-01',NULL,'2025-01-10'),
-    ('order-canceled','customer-known','canceled','2018-01-01',NULL,'2018-01-06');
+    ('order-canceled','customer-known','canceled','2018-01-01',NULL,'2018-01-06'),
+    ('order-zero','customer-known','created','2018-02-01',NULL,'2018-02-10');
 INSERT INTO staging.order_reviews(review_id,order_id,review_score,review_creation_date) VALUES
     ('review-old','order-known','1','2018-01-06'),('review-new','order-known','5','2018-01-07');
 INSERT INTO staging.order_items(order_id,order_item_id,product_id,seller_id,price,freight_value) VALUES
@@ -32,9 +33,11 @@ INSERT INTO staging.order_items(order_id,order_item_id,product_id,seller_id,pric
     ('order-no-customer','1','missing-product','missing-seller','30','4'),
     ('orphan-a','1','product-blank','seller-known','40','5'),
     ('orphan-b','1',NULL,NULL,'50','6'),
-    ('order-canceled','1','product-new','seller-known','60','7');
+    ('order-canceled','1','product-new','seller-known','60','7'),
+    ('order-zero','1','product-known','seller-known','0','0');
 INSERT INTO staging.order_payments VALUES
-    ('order-known','1','credit_card','1','15'),('order-known','2','voucher','1','20'),
+    ('order-known','1','credit_card','1','10'),('order-known','2','credit_card','3','5'),
+    ('order-known','3','voucher','1','20'),('order-zero','1','credit_card','1','0'),
     ('orphan-a','1','credit_card','1','45'),('orphan-b','1','credit_card','1','56'),
     ('order-canceled','1','credit_card','1','67');
 
@@ -90,9 +93,51 @@ BEGIN
     END;
 END $$;
 
+-- Known expected values catch fan-out and division-by-zero errors.
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM dw.v_sales_kpis WHERE order_count=5 AND gmv=69
+        AND aov=13.80 AND on_time_delivery_pct=100 AND freight_to_price_pct=15)
+       OR NOT EXISTS (SELECT 1 FROM dw.v_monthly_kpis WHERE month='2018-02-01'
+        AND aov=0 AND on_time_delivery_pct IS NULL) THEN
+        RAISE EXCEPTION 'KPI formulas or zero-denominator handling failed';
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM dw.v_payment_method_metrics WHERE month='2018-01-01'
+        AND payment_type='credit_card' AND payment_rows=2 AND order_count=1
+        AND payment_total=15 AND avg_installments=2 AND payment_share_pct=42.86)
+       OR NOT EXISTS (SELECT 1 FROM dw.v_payment_method_metrics WHERE month='2018-02-01'
+        AND payment_total=0 AND payment_share_pct IS NULL) THEN
+        RAISE EXCEPTION 'Payment aggregation or share calculation failed';
+    END IF;
+    IF (SELECT sum(gmv) FROM dw.mv_category_seller_metrics) IS DISTINCT FROM 69::numeric
+       OR (SELECT sum(item_count) FROM dw.mv_category_seller_metrics) IS DISTINCT FROM 4::numeric
+       OR NOT EXISTS (SELECT 1 FROM dw.mv_category_seller_metrics WHERE month='2018-02-01'
+        AND freight_to_price_pct IS NULL) THEN
+        RAISE EXCEPTION 'Category/seller grain or zero-price ratio failed';
+    END IF;
+END $$;
+
+-- Change an amount, refresh the stored reports, and prove they were not recreated.
+CREATE TEMP TABLE report_objects AS
+SELECT oid FROM pg_class WHERE oid IN ('dw.mv_monthly_kpis'::regclass,
+    'dw.mv_regional_metrics'::regclass,'dw.mv_category_seller_metrics'::regclass);
+UPDATE staging.order_items SET price='20' WHERE order_id='order-known' AND order_item_id='1';
+UPDATE dw.fact_order_items SET price=20,total_item_value=22
+WHERE source_order_id='order-known' AND order_item_id=1;
+\ir ../sql/06_refresh_views.sql
+DO $$
+BEGIN
+    IF (SELECT sum(gmv) FROM dw.mv_monthly_kpis) IS DISTINCT FROM 79::numeric
+       OR (SELECT sum(gmv) FROM dw.mv_regional_metrics) IS DISTINCT FROM 79::numeric
+       OR (SELECT sum(gmv) FROM dw.mv_category_seller_metrics) IS DISTINCT FROM 79::numeric
+       OR (SELECT count(*) FROM pg_class JOIN report_objects USING(oid))<>3 THEN
+        RAISE EXCEPTION 'Refresh did not update totals or replaced the stored reports';
+    END IF;
+END $$;
+
 -- Repeat the same load to exercise idempotency with NOT NULL/default constraints active.
 \ir ../sql/transform_warehouse.sql
 \ir ../sql/04_views.sql
 \ir ../sql/05_validate.sql
 ROLLBACK;
-\echo 'Unknown-member, department, orphan-grain, financial and repeat-load tests passed; fixture rolled back.'
+\echo 'Warehouse, reporting formulas, refresh and repeat-load tests passed; fixture rolled back.'

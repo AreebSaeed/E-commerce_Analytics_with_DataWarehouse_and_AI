@@ -22,7 +22,16 @@ UNION ALL SELECT 'monthly eligible GMV',
     coalesce((SELECT sum(gmv) FROM dw.mv_monthly_kpis),0)
 UNION ALL SELECT 'regional eligible GMV',
     coalesce((SELECT sum(i.price::numeric+i.freight_value::numeric) FROM staging.order_items i JOIN staging.orders o USING(order_id) WHERE o.order_status NOT IN ('canceled','unavailable')),0),
-    coalesce((SELECT sum(gmv) FROM dw.mv_regional_metrics),0);
+    coalesce((SELECT sum(gmv) FROM dw.mv_regional_metrics),0)
+UNION ALL SELECT 'category/seller eligible GMV',
+    coalesce((SELECT sum(i.price::numeric+i.freight_value::numeric) FROM staging.order_items i JOIN staging.orders o USING(order_id) WHERE o.order_status NOT IN ('canceled','unavailable')),0),
+    coalesce((SELECT sum(gmv) FROM dw.mv_category_seller_metrics),0)
+UNION ALL SELECT 'payment method totals',
+    coalesce((SELECT sum(p.payment_value::numeric) FROM staging.order_payments p JOIN staging.orders o USING(order_id) WHERE o.order_status NOT IN ('canceled','unavailable')),0),
+    coalesce((SELECT sum(payment_total) FROM dw.v_payment_method_metrics),0)
+UNION ALL SELECT 'headline eligible GMV',
+    coalesce((SELECT sum(i.price::numeric+i.freight_value::numeric) FROM staging.order_items i JOIN staging.orders o USING(order_id) WHERE o.order_status NOT IN ('canceled','unavailable')),0),
+    (SELECT gmv FROM dw.v_sales_kpis);
 
 CREATE TEMP TABLE warehouse_unknown_counts (
     reference_name text, unknown_rows bigint, null_rows bigint

@@ -1,4 +1,4 @@
-param([string]$Database='olist_dw',[string]$User='postgres',[string]$HostName='localhost',[int]$Port=5432)
+param([string]$Database='olist_dw',[string]$User='postgres',[string]$HostName='localhost',[int]$Port=5432,[switch]$ReportsOnly)
 $ErrorActionPreference='Stop'
 # Read literal KEY=VALUE settings; never execute the contents of .env.
 $connection=@{}
@@ -25,6 +25,13 @@ Push-Location $PSScriptRoot
 $previousPassword=$env:PGPASSWORD
 try {
   if($connection['PGPASSWORD']){ $env:PGPASSWORD=$connection['PGPASSWORD'] }
+  if($ReportsOnly){
+    & $psql -X -v ON_ERROR_STOP=1 -U $User -h $HostName -p $Port -d $Database -f sql/04_views.sql
+    if($LASTEXITCODE -ne 0){throw 'Reporting update failed'}
+    & $psql -X -v ON_ERROR_STOP=1 -U $User -h $HostName -p $Port -d $Database -f sql/05_validate.sql
+    if($LASTEXITCODE -ne 0){throw 'Warehouse validation failed'}
+    return
+  }
   $geo=Test-Path 'data/raw/olist_geolocation_dataset.csv'
   $geoFlag=if($geo){'true'}else{'false'}
   $exists=& $psql -X -v ON_ERROR_STOP=1 -U $User -h $HostName -p $Port -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname='$Database'"
