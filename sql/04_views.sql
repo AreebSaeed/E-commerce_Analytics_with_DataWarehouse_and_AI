@@ -67,6 +67,11 @@ FROM dw.v_order_metrics o JOIN dw.dim_customer c USING(customer_key)
 GROUP BY c.state;
 CREATE UNIQUE INDEX IF NOT EXISTS ix_mv_regional_metrics ON dw.mv_regional_metrics(state);
 
+-- Ordinary views over stored summaries are easy to select in BI connectors.
+CREATE OR REPLACE VIEW dw.v_regional_metrics AS
+SELECT state, order_count, gmv, avg_delivery_days
+FROM dw.mv_regional_metrics;
+
 -- Grain: purchase month + product category + seller.
 -- GMV and item counts are additive; distinct order counts across groups are not.
 CREATE MATERIALIZED VIEW IF NOT EXISTS dw.mv_category_seller_metrics AS
@@ -88,6 +93,12 @@ GROUP BY 1, c.category_key, c.category_name_en, c.macro_department,
     s.seller_key, s.seller_id, s.state;
 CREATE UNIQUE INDEX IF NOT EXISTS ix_mv_category_seller_metrics
 ON dw.mv_category_seller_metrics(month,category_key,seller_key);
+
+CREATE OR REPLACE VIEW dw.v_category_seller_metrics AS
+SELECT month, category_key, category_name_en, macro_department,
+    seller_key, seller_id, seller_state, item_count, order_count,
+    item_price, freight, gmv, gmv_per_order, freight_to_price_pct
+FROM dw.mv_category_seller_metrics;
 
 -- Payments are summarized directly; no join to item-grain facts.
 -- An order using two methods appears once in each method's order count.

@@ -13,7 +13,13 @@ UNION ALL SELECT 'delivery features',(SELECT count(*) FROM staging.orders),(SELE
 UNION ALL SELECT 'customer features',
     (SELECT count(DISTINCT customer_unique_id) FROM dw.dim_customer
       WHERE customer_key<>0 AND nullif(btrim(customer_unique_id),'') IS NOT NULL),
-    (SELECT count(*) FROM dw.v_customer_features);
+    (SELECT count(*) FROM dw.v_customer_features)
+UNION ALL SELECT 'regional BI view',
+    (SELECT count(*) FROM dw.mv_regional_metrics),
+    (SELECT count(*) FROM dw.v_regional_metrics)
+UNION ALL SELECT 'category/seller BI view',
+    (SELECT count(*) FROM dw.mv_category_seller_metrics),
+    (SELECT count(*) FROM dw.v_category_seller_metrics);
 
 CREATE TEMP TABLE warehouse_money_checks AS
 SELECT 'item price' AS metric,
@@ -36,7 +42,13 @@ UNION ALL SELECT 'payment method totals',
     coalesce((SELECT sum(payment_total) FROM dw.v_payment_method_metrics),0)
 UNION ALL SELECT 'headline eligible GMV',
     coalesce((SELECT sum(i.price::numeric+i.freight_value::numeric) FROM staging.order_items i JOIN staging.orders o USING(order_id) WHERE o.order_status NOT IN ('canceled','unavailable')),0),
-    (SELECT gmv FROM dw.v_sales_kpis);
+    (SELECT gmv FROM dw.v_sales_kpis)
+UNION ALL SELECT 'regional BI GMV',
+    coalesce((SELECT sum(gmv) FROM dw.mv_regional_metrics),0),
+    coalesce((SELECT sum(gmv) FROM dw.v_regional_metrics),0)
+UNION ALL SELECT 'category/seller BI GMV',
+    coalesce((SELECT sum(gmv) FROM dw.mv_category_seller_metrics),0),
+    coalesce((SELECT sum(gmv) FROM dw.v_category_seller_metrics),0);
 
 CREATE TEMP TABLE warehouse_unknown_counts (
     reference_name text, unknown_rows bigint, null_rows bigint

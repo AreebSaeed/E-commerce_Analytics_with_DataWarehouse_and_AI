@@ -148,8 +148,8 @@ The reporting layer uses ordinary SQL views and three materialized views (stored
 | --- | --- |
 | `dw.v_sales_kpis` | One row: eligible orders, GMV, AOV, on-time delivery percentage, average review score, and freight-to-price percentage. |
 | `dw.v_monthly_kpis` | Monthly GMV, orders, AOV, review scores, and on-time delivery percentage, using `dw.mv_monthly_kpis`. |
-| `dw.mv_regional_metrics` | Customer-state GMV, eligible order counts, and average delivery time. |
-| `dw.mv_category_seller_metrics` | Monthly category/seller sales, department labels, item counts, distinct order counts, GMV per order within the group, and freight-to-price percentage. |
+| `dw.v_regional_metrics` | Customer-state GMV, eligible order counts, and average delivery time. |
+| `dw.v_category_seller_metrics` | Monthly category/seller sales, department labels, item counts, distinct order counts, GMV per order within the group, and freight-to-price percentage. |
 | `dw.v_payment_method_metrics` | Monthly payment amounts by method, payment row counts, distinct orders, average installments, and share of the month's payment value. |
 | `dw.v_order_metrics` | One row per real order, with item and payment totals aggregated separately. |
 
@@ -158,7 +158,7 @@ Preview the reports in pgAdmin's Query Tool:
 ```sql
 SELECT * FROM dw.v_sales_kpis;
 SELECT * FROM dw.v_monthly_kpis ORDER BY month;
-SELECT * FROM dw.mv_category_seller_metrics ORDER BY gmv DESC LIMIT 20;
+SELECT * FROM dw.v_category_seller_metrics ORDER BY gmv DESC LIMIT 20;
 SELECT * FROM dw.v_payment_method_metrics ORDER BY month, payment_total DESC;
 ```
 
@@ -169,6 +169,8 @@ To update the reporting definitions, refresh the summaries, and validate them wi
 ```
 
 Normal setup also updates the reports automatically. For a refresh alone, run the three SQL statements in `sql/06_refresh_views.sql` in pgAdmin. Existing materialized views are refreshed concurrently rather than dropped, so their definitions and dependent reports remain intact. Regular views read current data; materialized views show the last refreshed data. Do not run a warehouse rebuild at the same time as a separate reporting refresh.
+
+For Power BI, select the `dw.v_*` reporting views. `v_regional_metrics` and `v_category_seller_metrics` expose the stored `mv_*` summaries as ordinary views, because the materialized views may not appear in Power BI's Navigator. Refresh the connection list after updating the reports.
 
 Financial summaries exclude canceled/unavailable orders and orphan facts. Delivery and review metrics include all real orders; the on-time denominator is delivered orders. AOV is eligible GMV divided by eligible orders, including orders with no items. Freight-to-price percentage is `100 * total freight / total item price`. Percentages use 0-100; a zero denominator returns NULL instead of a misleading percentage. Average installments are calculated per payment row.
 
