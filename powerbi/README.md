@@ -19,6 +19,8 @@ Selected AOV = DIVIDE([Selected GMV], [Selected Orders])
 Selected On-Time % = 100 * DIVIDE(SUM('dw v_monthly_kpis'[on_time_orders]), SUM('dw v_monthly_kpis'[delivered_orders]))
 ```
 
+The [Olist KPI Cards custom visual](olist-kpi-cards/README.md) ports the portal's four KPI cards to Power BI. Its headline fields accept the measures above. Use the Category and Value fields to show one selectable card per category.
+
 Run the read-only reconciliation against the current PostgreSQL database:
 
 ```powershell

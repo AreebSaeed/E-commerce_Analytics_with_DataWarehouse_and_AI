@@ -1,0 +1,23 @@
+{
+  "visual": {
+    "name": "olistKpiCards",
+    "displayName": "Olist KPI Cards",
+    "guid": "OlistKpiCardsB92966A3C4614C1E9AD1CE9680187AFE",
+    "visualClassName": "Visual",
+    "version": "1.0.0.0",
+    "description": "KPI cards styled to match Olist Commerce Studio, with optional category selections.",
+    "supportUrl": "https://github.com/AreebSaeed/E-commerce_Analytics_with_DataWarehouse_and_AI/issues",
+    "gitHubUrl": "https://github.com/AreebSaeed/E-commerce_Analytics_with_DataWarehouse_and_AI"
+  },
+  "apiVersion": "5.11.1",
+  "author": {
+    "name": "Olist Commerce Studio project",
+    "email": "olist-kpi-cards@example.com"
+  },
+  "assets": { "icon": "assets/icon.png" },
+  "externalJS": [],
+  "style": "style/visual.less",
+  "capabilities": "capabilities.json",
+  "dependencies": null,
+  "stringResources": []
+}

@@ -1,0 +1,47 @@
+{
+  "privileges": [],
+  "dataRoles": [
+    { "name": "category", "displayName": "Category", "kind": "Grouping" },
+    { "name": "value", "displayName": "Value", "kind": "Measure", "requiredTypes": [{ "numeric": true }, { "integer": true }] },
+    { "name": "comparison", "displayName": "Comparison value", "kind": "Measure", "requiredTypes": [{ "numeric": true }, { "integer": true }] },
+    { "name": "gmv", "displayName": "Gross merchandise value", "kind": "Measure", "requiredTypes": [{ "numeric": true }, { "integer": true }] },
+    { "name": "orders", "displayName": "Orders", "kind": "Measure", "requiredTypes": [{ "numeric": true }, { "integer": true }] },
+    { "name": "aov", "displayName": "Average order value", "kind": "Measure", "requiredTypes": [{ "numeric": true }, { "integer": true }] },
+    { "name": "onTime", "displayName": "On-time delivery (0–100)", "kind": "Measure", "requiredTypes": [{ "numeric": true }, { "integer": true }] }
+  ],
+  "dataViewMappings": [
+    {
+      "conditions": [
+        { "category": { "min": 1, "max": 1 }, "value": { "max": 1 }, "comparison": { "max": 1 }, "gmv": { "max": 0 }, "orders": { "max": 0 }, "aov": { "max": 0 }, "onTime": { "max": 0 } }
+      ],
+      "categorical": {
+        "categories": { "for": { "in": "category" }, "dataReductionAlgorithm": { "top": { "count": 1000 } } },
+        "values": { "select": [{ "bind": { "to": "value" } }, { "bind": { "to": "comparison" } }] }
+      }
+    },
+    {
+      "conditions": [
+        { "category": { "max": 0 }, "value": { "max": 0 }, "comparison": { "max": 0 }, "gmv": { "max": 1 }, "orders": { "max": 1 }, "aov": { "max": 1 }, "onTime": { "max": 1 } }
+      ],
+      "categorical": {
+        "values": {
+          "select": [{ "bind": { "to": "gmv" } }, { "bind": { "to": "orders" } }, { "bind": { "to": "aov" } }, { "bind": { "to": "onTime" } }]
+        }
+      }
+    }
+  ],
+  "objects": {
+    "cardStyle": {
+      "properties": {
+        "background": { "type": { "fill": { "solid": { "color": true } } } },
+        "valueColor": { "type": { "fill": { "solid": { "color": true } } } },
+        "accentColor": { "type": { "fill": { "solid": { "color": true } } } },
+        "valueSize": { "type": { "numeric": true } },
+        "borderRadius": { "type": { "numeric": true } }
+      }
+    }
+  },
+  "tooltips": { "supportedTypes": { "default": true } },
+  "supportsKeyboardFocus": true,
+  "supportsEmptyDataView": true
+}

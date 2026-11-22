@@ -1,0 +1,22 @@
+{
+  "name": "olist-kpi-cards",
+  "version": "1.0.0",
+  "private": true,
+  "engines": { "node": "^20.19.0 || ^22.13.0 || >=24" },
+  "scripts": {
+    "check": "tsc --noEmit",
+    "start": "pbiviz start --all-locales",
+    "package": "pbiviz package --all-locales --no-stats"
+  },
+  "dependencies": {
+    "@fontsource-variable/dm-sans": "5.3.0",
+    "@fontsource-variable/manrope": "5.3.0",
+    "powerbi-visuals-api": "5.11.1",
+    "powerbi-visuals-utils-formattingmodel": "7.1.0",
+    "powerbi-visuals-utils-formattingutils": "7.0.0"
+  },
+  "devDependencies": {
+    "powerbi-visuals-tools": "7.2.1",
+    "typescript": "5.9.3"
+  }
+}

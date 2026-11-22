@@ -1,0 +1,149 @@
+@import "font-licenses.less";
+
+@font-face {
+    font-family: "Olist KPI DM Sans";
+    font-style: normal;
+    font-weight: 100 1000;
+    font-display: swap;
+    src: data-uri("font/woff2;base64", "../node_modules/@fontsource-variable/dm-sans/files/dm-sans-latin-wght-normal.woff2") format("woff2");
+}
+
+@font-face {
+    font-family: "Olist KPI Manrope";
+    font-style: normal;
+    font-weight: 200 800;
+    font-display: swap;
+    src: data-uri("font/woff2;base64", "../node_modules/@fontsource-variable/manrope/files/manrope-latin-wght-normal.woff2") format("woff2");
+}
+
+.olist-kpi-visual {
+    box-sizing: border-box;
+    overflow: auto;
+    padding: 4px 6px 12px;
+    font-family: "Olist KPI DM Sans", "Segoe UI", sans-serif;
+    font-synthesis: none;
+    color: #263c45;
+
+    .kpi-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 15px;
+    }
+
+    .kpi-card {
+        --accent: var(--primary-color);
+        --arrow-color: var(--accent);
+        box-sizing: border-box;
+        appearance: none;
+        position: relative;
+        overflow: hidden;
+        min-width: 0;
+        min-height: 125px;
+        padding: 20px 21px 19px;
+        border: 1px solid #e7eeea;
+        border-radius: var(--card-radius);
+        background: var(--card-background);
+        box-shadow: 0 5px 18px #183d3910;
+        text-align: start;
+        font: inherit;
+
+        &.teal { --arrow-color: #14b5a4; }
+        &.blue { --accent: #7395b8; }
+        &.amber { --accent: #e5b876; }
+        &.coral { --accent: #e79e90; }
+
+        &[aria-pressed] { cursor: pointer; }
+        &:focus-visible,
+        &[aria-pressed="true"] {
+            outline: 2px solid var(--accent);
+            outline-offset: -3px;
+        }
+
+        &.is-dimmed { opacity: .55; }
+    }
+
+    .kpi-label {
+        display: flex;
+        justify-content: space-between;
+        gap: 4px;
+        color: #768a8c;
+        font-size: 11px;
+        font-weight: 700;
+        line-height: normal;
+        overflow-wrap: anywhere;
+    }
+
+    .kpi-arrow {
+        flex: none;
+        color: var(--arrow-color);
+        font-size: 18px;
+        line-height: 10px;
+    }
+
+    .kpi-value {
+        display: block;
+        margin-top: 12px;
+        color: var(--value-color);
+        font: 800 var(--value-size)/1.25 "Olist KPI Manrope", "Segoe UI", sans-serif;
+        letter-spacing: -1.3px;
+        overflow-wrap: anywhere;
+    }
+
+    .kpi-caption {
+        display: block;
+        margin-top: 5px;
+        color: #a1aeae;
+        font-size: 10px;
+        line-height: normal;
+        overflow-wrap: anywhere;
+    }
+
+    .kpi-accent {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        height: 3px;
+        background: var(--accent);
+    }
+
+    .kpi-status {
+        padding: 16px;
+        font-size: 13px;
+    }
+
+    &.medium .kpi-value { font-size: max(12px, calc(var(--value-size) - 4px)); }
+    &.two-columns .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+    &.compact {
+        .kpi-grid { gap: 9px; }
+        .kpi-card { min-height: 112px; padding: 15px; }
+        .kpi-label, .kpi-caption { font-size: 9px; }
+        .kpi-value { font-size: max(12px, calc(var(--value-size) - 8px)); }
+    }
+
+    &.single-column .kpi-grid { grid-template-columns: minmax(0, 1fr); }
+
+    &.high-contrast {
+        background: var(--contrast-background);
+        color: var(--contrast-foreground);
+
+        .kpi-card {
+            border-color: var(--contrast-foreground);
+            background: var(--contrast-background);
+            box-shadow: none;
+            opacity: 1;
+
+            &:focus-visible,
+            &[aria-pressed="true"] {
+                outline-color: var(--contrast-selection);
+            }
+        }
+
+        .kpi-label, .kpi-value, .kpi-caption, .kpi-arrow {
+            color: var(--contrast-foreground);
+        }
+
+        .kpi-accent { background: var(--contrast-foreground); }
+    }
+}
