@@ -1,10 +1,9 @@
 # Local database credentials
 .env
 .env.*
-!.env.example
 
 # Raw source datasets
-/data/raw/
+# /data/raw/
 
 # Local Python environment and downloaded tooling
 /.venv/

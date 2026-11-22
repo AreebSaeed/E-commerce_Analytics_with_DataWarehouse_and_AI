@@ -2,6 +2,28 @@
 
 This project loads the Olist CSV files into a local PostgreSQL database. A small Python runner uses pandas and SQLAlchemy to load the CSVs, then runs the existing SQL transformations and reports through PostgreSQL's `psql` client. pgAdmin is the graphical client for exploring the resulting schemas, tables, and views.
 
+## Architecture and quick start
+
+The nine CSVs flow through `staging` tables into the `dw` dimensions and facts. SQL views and stored summaries provide reporting metrics. Python trains the delivery-risk and customer-segmentation models, writes their outputs back to `dw`, and saves local model files. Power BI imports the reporting views and ML tables. The TypeScript portal reads an exported aggregate JSON snapshot; its local Python API loads the saved delivery model for what-if predictions.
+
+For a fresh local setup, install PostgreSQL (including `psql`), Python 3.12, and Node.js. Put the nine Olist CSVs in `data/raw`, copy `.env.example` to `.env`, and fill in `PGPASSWORD` for your local PostgreSQL server. Then, from this folder in PowerShell:
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\setup.ps1
+.\.venv\Scripts\python.exe train_delivery.py
+.\.venv\Scripts\python.exe segment_customers.py
+.\.venv\Scripts\python.exe web\export_snapshot.py
+cd web
+npm.cmd ci
+npm.cmd run build
+cd ..
+.\.venv\Scripts\python.exe web\predict_api.py
+```
+
+Open `http://127.0.0.1:8000/`. Open [Olist_PowerBI_Dashboard.pbix](Olist_PowerBI_Dashboard.pbix) separately in Power BI Desktop and refresh its PostgreSQL import. The raw CSVs, `.env`, `.venv`, and trained `.joblib` files are local inputs or generated files; a fresh setup needs to create them. There is no Docker setup because this project is intended to run locally on this computer.
+
 ## Load
 
 Connection settings are read from `.env` in the project folder. Set `PGPASSWORD` to your PostgreSQL server password, or leave it blank to be prompted. The defaults are host `localhost`, port `5432`, database `olist_dw`, and user `postgres`. The file is ignored by Git to keep local credentials out of commits. Values are literal; you may wrap a password in matching quotes. Command-line parameters override the corresponding `.env` settings.
@@ -20,7 +42,7 @@ In pgAdmin, refresh Servers → PostgreSQL → Databases → `olist_dw`. Browse 
 
 The facts have separate item and payment grains. Use `dw.v_order_metrics` for order-level financial reports to avoid multiplying amounts through joins. Financial summaries exclude canceled and unavailable orders; the base order view retains all statuses for auditing.
 
-The late-delivery model and customer segmentation are implemented; Power BI reports remain a separate next stage.
+The late-delivery model, customer segmentation, Power BI report, and TypeScript portal are implemented.
 
 ## Machine learning feature datasets
 
@@ -28,7 +50,7 @@ Step 4 is provided by three SQL views. They update automatically when the wareho
 
 | View | Grain and purpose |
 | --- | --- |
-| `dw.v_delivery_features` | One row per real order. Purchase-time inputs for a future late-delivery model: month and weekday, customer and seller state, item count, price, freight, product weight/volume, and seller-to-customer distance in km. |
+| `dw.v_delivery_features` | One row per real order. Purchase-time inputs for the late-delivery model: month and weekday, customer and seller state, item count, price, freight, product weight/volume, and seller-to-customer distance in km. |
 | `dw.v_delivery_training` | Delivered orders with an estimated delivery date and purchase time. Adds `label_is_late` for model training and evaluation. |
 | `dw.v_customer_features` | One row per permanent `customer_unique_id`: recency, frequency, GMV, log GMV, average review score, and average delivery delay. |
 
@@ -40,7 +62,7 @@ SELECT * FROM dw.v_delivery_training LIMIT 10;
 SELECT * FROM dw.v_customer_features LIMIT 10;
 ```
 
-`v_delivery_features` contains no actual delivery date, review score, order status, or late-delivery label. `purchase_timestamp` and `order_id` identify and chronologically split records; they should not be fed directly to a model as predictors. The label is only in `v_delivery_training`, and a future training script must remove it from the input columns. Undelivered, canceled, unavailable, and unestimable orders have no observed training label. A future model can score rows from `v_delivery_features`, including orders without outcomes.
+`v_delivery_features` contains no actual delivery date, review score, order status, or late-delivery label. `purchase_timestamp` and `order_id` identify and chronologically split records; they are not model predictors. The label is only in `v_delivery_training`, and `train_delivery.py` excludes it from the input columns. Undelivered, canceled, unavailable, and unestimable orders have no observed training label. The trained model can score rows from `v_delivery_features`, including orders without outcomes.
 
 For orders with several sellers, the seller with the highest item total supplies the representative state and distance; ties use seller key. The distance uses the average coordinates for each postal prefix and the Haversine formula. Missing or clearly out-of-range coordinates produce NULL, not a fabricated distance. The broad screening box is latitude -34 to 6 and longitude -74 to -34, based on [IBGE's published extreme points of Brazil](https://www.ibge.gov.br/biblioteca/visualizacao/periodicos/2/bn_2023_v31_art02.pdf). This box rejects obvious errors but is not a precise border or state check. Product totals sum known item measurements; `weight_known_items` and `volume_known_items` show how many measurements contributed, so incomplete totals can be identified.
 
@@ -177,6 +199,40 @@ Normal setup also updates the reports automatically. For a refresh alone, run th
 For Power BI, select the `dw.v_*` reporting views. `v_regional_metrics` and `v_category_seller_metrics` expose the stored `mv_*` summaries as ordinary views, because the materialized views may not appear in Power BI's Navigator. Refresh the connection list after updating the reports.
 
 The three-page Power BI report and its reconciliation instructions are in [powerbi/README.md](powerbi/README.md).
+
+## Performance and spatial checks
+
+Run the read-only SQL benchmark after loading the warehouse:
+
+```powershell
+.\.venv\Scripts\python.exe performance\benchmark.py
+```
+
+It runs `EXPLAIN (ANALYZE, BUFFERS)` plus three warm client reads for the reporting and portal queries. On this local database, the slowest observed PostgreSQL execution in the final run was the portal's yearly regional query at **1,149 ms**. Its slowest warm client read was **910 ms**. The payment-method report took **504 ms** in PostgreSQL and at most **796 ms** for a warm client read. All tested SQL reads were below the proposal's **1.5-second target** in that run. These are local measurements, not guarantees for another computer or a Power BI visual render.
+
+The plan showed repeated table fetches while aggregating order-item amounts. `ix_items_order_amounts` now covers the order key, price, freight, and item total used by those reports. In the first before/after measurement, the sales KPI query fell from **566 ms to 252 ms** in PostgreSQL. Other full-scan groupings use sequential scans because they read nearly all rows; adding indexes to those grouping columns would not necessarily help.
+
+For a local portal check, start `web/predict_api.py`, then run:
+
+```powershell
+.\.venv\Scripts\python.exe performance\portal_benchmark.py
+```
+
+In five warm requests, the largest measured times were **24 ms** for dashboard HTML, **17 ms** for its data snapshot, **17 ms** for model metadata, and **124 ms** for a what-if prediction. These timings measure local HTTP responses and model inference, not browser drawing. Power BI uses Import mode, so report interactions read its local model after refresh rather than issuing these PostgreSQL queries on each click.
+
+Power BI Desktop's **View > Performance Analyzer** was also used to time a warm **Refresh visuals** on each page. The slowest individual visual was **518 ms** on Executive & Sales, **255 ms** on Geospatial & Logistics, and **196 ms** on AI & Customer Intelligence. The exports are [executive](performance/powerbi_executive.json), [logistics](performance/powerbi_logistics.json), and [AI](performance/powerbi_ai.json). All warm visual timings were below 1.5 seconds. The first executive refresh after reopening the PBIX included visuals around **1.6 seconds**, so the target was **not met on that initial refresh**. These measurements were made on this computer with imported data; a different machine may behave differently.
+
+Run [performance/spatial_examples.sql](performance/spatial_examples.sql) in pgAdmin to see a bounding-box search and ten nearby postal prefixes around Sao Paulo. The box contained **4,522** prefixes here, and the nearest prefix was `01001` at about **0.08 km**. `EXPLAIN` confirmed both queries use the existing GiST index `ix_geo_point`. Nearest-neighbor candidate ranking uses planar degrees; displayed distances use Haversine kilometers. Postal-prefix centroids and the broad coordinate screening are approximate locations, not street addresses.
+
+The setup commands were also checked in temporary clean Python and TypeScript environments: pinned Python dependencies installed, all eight Python tests passed, SQL reconciliation passed, and a fresh `npm ci` plus TypeScript build succeeded. The temporary environments were removed afterward. This checks the application setup on the current computer; a second computer was not tested.
+
+## Limitations
+
+- The held-out late-delivery F1 is **0.070**. Its risk bands are based on uncalibrated scores, so do not treat them as dependable warnings or verified probabilities.
+- Customer segment names describe this historical sample. Cluster labels and profiles can change after retraining.
+- The TypeScript portal reads an exported snapshot. Rerun `web/export_snapshot.py` and rebuild after warehouse or model changes; refresh Power BI's imported data separately.
+- Spatial coordinates are postal-prefix centroids. The state dashboard uses state summaries rather than a street-level map.
+- The 1.5-second checks cover local SQL, HTTP/model responses, and warm Power BI visuals. Browser rendering was not measured, and Power BI's first executive refresh after reopening slightly exceeded the target.
 
 Financial summaries exclude canceled/unavailable orders and orphan facts. Delivery and review metrics include all real orders; the on-time denominator is delivered orders. AOV is eligible GMV divided by eligible orders, including orders with no items. Freight-to-price percentage is `100 * total freight / total item price`. Percentages use 0-100; a zero denominator returns NULL instead of a misleading percentage. Average installments are calculated per payment row.
 
