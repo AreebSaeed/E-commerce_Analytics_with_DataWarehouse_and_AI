@@ -1,0 +1,37 @@
+{
+  "version": "segments_20261124_202832_620212",
+  "selected_k": 2,
+  "sample_size": 2000,
+  "silhouette_scores": {
+    "2": 0.602354914565544,
+    "3": 0.3215254720490681,
+    "4": 0.25686476276904147,
+    "5": 0.24500350127001846,
+    "6": 0.24737426445607869,
+    "7": 0.23702833904659235,
+    "8": 0.2294617627817703
+  },
+  "cluster_profiles": {
+    "0": {
+      "customers": 92102,
+      "label": "One-time lower spend buyers (Cluster 0)",
+      "frequency_orders": 1.0,
+      "monetary_gmv": 105.63,
+      "recency_days": 225.0,
+      "avg_review_score": 5.0,
+      "avg_delivery_delay_days": -11.67
+    },
+    "1": {
+      "customers": 2888,
+      "label": "Higher spend repeat buyers (Cluster 1)",
+      "frequency_orders": 2.0,
+      "monetary_gmv": 225.53,
+      "recency_days": 205.5,
+      "avg_review_score": 4.5,
+      "avg_delivery_delay_days": -11.86
+    }
+  },
+  "buyers_with_eligible_orders": 94990,
+  "buyers_without_eligible_orders": 1106,
+  "total_customers": 96096
+}

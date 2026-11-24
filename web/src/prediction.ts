@@ -5,6 +5,16 @@ type ModelInfo = {
 }
 type Prediction = { late_probability: number; predicted_late: boolean; risk_band: string; threshold: number }
 
+const stateNames: Record<string, string> = {
+  AC: 'Acre', AL: 'Alagoas', AM: 'Amazonas', AP: 'Amapá', BA: 'Bahia',
+  CE: 'Ceará', DF: 'Distrito Federal', ES: 'Espírito Santo', GO: 'Goiás',
+  MA: 'Maranhão', MG: 'Minas Gerais', MS: 'Mato Grosso do Sul', MT: 'Mato Grosso',
+  PA: 'Pará', PB: 'Paraíba', PE: 'Pernambuco', PI: 'Piauí', PR: 'Paraná',
+  RJ: 'Rio de Janeiro', RN: 'Rio Grande do Norte', RO: 'Rondônia', RR: 'Roraima',
+  RS: 'Rio Grande do Sul', SC: 'Santa Catarina', SE: 'Sergipe', SP: 'São Paulo',
+  TO: 'Tocantins',
+}
+
 const options = (values: [string, string][], selected: string) => values.map(([value, label]) =>
   `<option value="${value}" ${value === selected ? 'selected' : ''}>${label}</option>`).join('')
 
@@ -13,13 +23,20 @@ function field(name: string, title: string, values: [string, string][], selected
 }
 
 const numeric = (values: number[], suffix = ''): [string, string][] => values.map(value => [String(value), `${value.toLocaleString()}${suffix}`])
+const itemCounts = [1, 2, 3, 4, 5, 10]
+const countFields = ['weight_known_items', 'volume_known_items']
+const measurementCounts = (itemCount: number): [string, string][] => [
+  ['auto', 'Automatic'],
+  ...numeric(Array.from({ length: itemCount + 1 }, (_, count) => count)),
+]
 
 function form(info: ModelInfo) {
-  const states: [string, string][] = info.states.map(state => [state, state])
+  const states = info.states.map((state): [string, string] => [state, stateNames[state] ?? state])
+    .sort(([, first], [, second]) => first.localeCompare(second, 'pt-BR'))
   const months: [string, string][] = ['January','February','March','April','May','June','July','August','September','October','November','December'].map((label, i) => [String(i + 1), label])
   const weekdays: [string, string][] = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'].map((label, i) => [String(i + 1), label])
   return `<div class="predict-layout"><form class="panel predict-form" id="predict-form">
-    <div class="panel-header"><div><span class="eyebrow">TRY THE TRAINED MODEL</span><h2>Order details</h2></div><span class="panel-tag">12 model inputs</span></div>
+    <div class="panel-header"><div><span class="eyebrow">TRY THE TRAINED MODEL</span><h2>Order details</h2></div></div>
     <p class="predict-intro">Choose details that would be known when an order is placed.</p>
     <div class="predict-group"><h3>When and where</h3><div class="predict-fields">
       ${field('purchase_month', 'Purchase month', months, '6')}
@@ -29,14 +46,21 @@ function form(info: ModelInfo) {
       ${field('seller_customer_distance_km', 'Seller to customer distance', numeric([0, 50, 200, 500, 1000, 2000, 3000], ' km'), '200', 'Approximate geographic distance')}
     </div></div>
     <div class="predict-group"><h3>Items and price</h3><div class="predict-fields">
-      ${field('item_count', 'Number of items', numeric([1, 2, 3, 4, 5, 10]), '1')}
+      ${field('item_count', 'Number of items', numeric(itemCounts), '1')}
       ${field('item_price', 'Total item price', numeric([25, 50, 100, 200, 500, 1000], ' BRL'), '100')}
       ${field('freight_value', 'Freight value', numeric([0, 10, 20, 40, 80, 150], ' BRL'), '20')}
       ${field('total_weight_g', 'Total known weight', numeric([0, 250, 500, 1000, 3000, 10000], ' g'), '500')}
-      ${field('weight_known_items', 'Items with known weight', numeric([0, 1, 2, 3, 4, 5, 10]), '1')}
       ${field('total_volume_cm3', 'Total known volume', numeric([0, 1000, 5000, 10000, 30000, 100000], ' cm³'), '5000')}
-      ${field('volume_known_items', 'Items with known volume', numeric([0, 1, 2, 3, 4, 5, 10]), '1')}
-    </div></div><div class="predict-actions"><button class="predict-submit" type="submit">Predict delivery risk <span>→</span></button><span>Runs the saved ${info.selected_model.replace('_', ' ')} model locally</span></div>
+    </div></div>
+    <details class="predict-group measurement-details">
+      <summary>Measurement counts (optional)</summary>
+      <p>For each measurement, Automatic counts all items when the total is above zero and zero items when the total is zero. Set the counts here if you measured only some items.</p>
+      <div class="predict-fields">
+        ${field('weight_known_items', 'Items with known weight', measurementCounts(1), 'auto')}
+        ${field('volume_known_items', 'Items with known volume', measurementCounts(1), 'auto')}
+      </div>
+    </details>
+    <div class="predict-actions"><button class="predict-submit" type="submit">Predict delivery risk <span>→</span></button><span>Runs the saved ${info.selected_model.replace('_', ' ')} model locally</span></div>
   </form><div class="predict-side"><section class="panel result-panel" aria-live="polite"><span class="eyebrow">PREDICTION</span><div id="prediction-result" class="result-empty"><div class="result-orb">✦</div><h2>Ready when you are</h2><p>Choose the order details, then select Predict delivery risk.</p></div></section>
   <section class="panel model-context"><span class="eyebrow">MODEL EVALUATION</span><h2>How this model was tested</h2><div class="split-bar"><span style="width:70%"></span><span style="width:15%"></span><span style="width:15%"></span></div><div class="split-labels"><span>70% train</span><span>15% validate</span><span>15% test</span></div>
   <p>Orders were split by purchase time. The final model was fitted on training and validation rows; the later test rows were held out.</p><div class="model-stats"><div><strong>${info.train_rows.toLocaleString()}</strong><span>Training rows</span></div><div><strong>${info.validation_rows.toLocaleString()}</strong><span>Validation rows</span></div><div><strong>${info.test.rows.toLocaleString()}</strong><span>Test rows</span></div></div><div class="model-quality"><div><span>Test precision</span><strong>${(info.test.precision * 100).toFixed(1)}%</strong></div><div><span>Test recall</span><strong>${(info.test.recall * 100).toFixed(1)}%</strong></div><div><span>Test F1</span><strong>${info.test.f1.toFixed(3)}</strong></div></div><p class="model-caution">Test performance is weak. This is a learning demo, not a dependable delivery warning.</p></section></div></div>`
@@ -51,11 +75,26 @@ export async function mountPredictor(container: HTMLElement) {
     if (!container.isConnected) return
     container.innerHTML = form(info)
     const formElement = container.querySelector<HTMLFormElement>('#predict-form')!
+    const itemCount = formElement.querySelector<HTMLSelectElement>('[name="item_count"]')!
+    itemCount.addEventListener('change', () => {
+      const count = Number(itemCount.value)
+      for (const name of countFields) {
+        const select = formElement.querySelector<HTMLSelectElement>(`[name="${name}"]`)!
+        const selection = Number(select.value) > count ? 'auto' : select.value
+        select.innerHTML = options(measurementCounts(count), selection)
+      }
+    })
     formElement.addEventListener('submit', async event => {
       event.preventDefault()
       const button = formElement.querySelector<HTMLButtonElement>('button[type=submit]')!
       const result = container.querySelector<HTMLDivElement>('#prediction-result')!
       const values = Object.fromEntries(new FormData(formElement).entries())
+      if (values.weight_known_items === 'auto') {
+        values.weight_known_items = Number(values.total_weight_g) > 0 ? itemCount.value : '0'
+      }
+      if (values.volume_known_items === 'auto') {
+        values.volume_known_items = Number(values.total_volume_cm3) > 0 ? itemCount.value : '0'
+      }
       const payload = Object.fromEntries(Object.entries(values).map(([key, value]) =>
         [key, key.endsWith('_state') ? value : Number(value)]))
       button.disabled = true

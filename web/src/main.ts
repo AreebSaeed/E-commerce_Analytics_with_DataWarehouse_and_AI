@@ -19,7 +19,12 @@ let page: Page = 'overview'
 let year = 'all'
 let regionSort: 'gmv' | 'order_count' = 'gmv'
 
-const money = (value: number) => `R$ ${new Intl.NumberFormat('en-US', { maximumFractionDigits: 1 }).format(value / 1_000_000)}M`
+const money = (value: number) => {
+  const amount = Math.abs(value)
+  if (amount >= 1_000_000) return `R$ ${(value / 1_000_000).toLocaleString('en-US', { maximumFractionDigits: 1 })}M`
+  if (amount >= 1_000) return `R$ ${(value / 1_000).toLocaleString('en-US', { maximumFractionDigits: 1 })}K`
+  return `R$ ${value.toLocaleString('en-US', { maximumFractionDigits: 2 })}`
+}
 const moneyExact = (value: number) => `R$ ${new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(value)}`
 const number = (value: number) => new Intl.NumberFormat('en-US').format(Math.round(value))
 const percent = (value: number) => `${value.toFixed(1)}%`

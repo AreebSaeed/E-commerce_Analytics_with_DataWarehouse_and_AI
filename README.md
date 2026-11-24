@@ -9,6 +9,14 @@ The nine CSVs flow through `staging` tables into the `dw` dimensions and facts. 
 For a fresh local setup, install PostgreSQL (including `psql`), Python 3.12, and Node.js. Put the nine Olist CSVs in `data/raw`, copy `.env.example` to `.env`, and fill in `PGPASSWORD` for your local PostgreSQL server. Then, from this folder in PowerShell:
 
 ```powershell
+python run_project.py
+```
+
+If the project virtual environment already exists, run `.\.venv\Scripts\python.exe run_project.py`. The driver reuses installed dependencies and installs any missing ones. It rebuilds and validates the warehouse, trains both models, exports the dashboard data, builds the frontend, and starts the local server. Open `http://127.0.0.1:8000/` when the server starts. Press `Ctrl+C` to stop it.
+
+To run the same stages individually:
+
+```powershell
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
 .\setup.ps1
