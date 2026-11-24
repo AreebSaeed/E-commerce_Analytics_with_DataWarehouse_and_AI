@@ -1,5 +1,28 @@
 \set ON_ERROR_STOP on
 
+BEGIN;
+
+-- An older local model added promised_delivery_days to both views.
+-- PostgreSQL cannot remove a column with CREATE OR REPLACE VIEW.
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM pg_attribute
+        WHERE attrelid = to_regclass('dw.v_delivery_features')
+          AND attname = 'promised_delivery_days' AND NOT attisdropped
+    ) THEN
+        DROP VIEW IF EXISTS dw.v_delivery_training;
+        DROP VIEW dw.v_delivery_features;
+    ELSIF EXISTS (
+        SELECT 1 FROM pg_attribute
+        WHERE attrelid = to_regclass('dw.v_delivery_training')
+          AND attname = 'promised_delivery_days' AND NOT attisdropped
+    ) THEN
+        DROP VIEW dw.v_delivery_training;
+    END IF;
+END
+$$;
+
 -- One row per order. Only identifiers, purchase-time facts, and features appear here.
 -- The highest-value seller represents a multi-seller order for state/distance.
 CREATE OR REPLACE VIEW dw.v_delivery_features AS
@@ -97,3 +120,5 @@ INSERT INTO meta.data_dictionary VALUES
  ('Customer recency','Days since the latest eligible purchase, measured from the latest eligible purchase date in the dataset. Customers with no eligible purchases have NULL recency.'),
  ('Customer frequency and monetary','Distinct eligible orders with a purchase timestamp, and sum of their order-level GMV. log_monetary_gmv is natural log(1 + nonnegative GMV).')
 ON CONFLICT(metric_name) DO UPDATE SET definition=excluded.definition;
+
+COMMIT;

@@ -95,6 +95,9 @@ class Handler(SimpleHTTPRequestHandler):
 if __name__ == "__main__":
     if not DIST.is_dir():
         raise SystemExit("Build the dashboard first: cd web; npm.cmd run build")
-    server = ThreadingHTTPServer(("127.0.0.1", 8000), Handler)
-    print("Dashboard and prediction API: http://127.0.0.1:8000", flush=True)
-    server.serve_forever()
+    with ThreadingHTTPServer(("127.0.0.1", 8000), Handler) as server:
+        print("Dashboard and prediction API: http://127.0.0.1:8000", flush=True)
+        try:
+            server.serve_forever()
+        except KeyboardInterrupt:
+            print("\nDashboard and prediction API stopped.")
