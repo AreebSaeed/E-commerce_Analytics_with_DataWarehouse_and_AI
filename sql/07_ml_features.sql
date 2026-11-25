@@ -49,13 +49,13 @@ WITH item_features AS (
 SELECT o.order_id, o.purchase_timestamp,
     extract(month from o.purchase_timestamp)::int AS purchase_month,
     extract(isodow from o.purchase_timestamp)::int AS purchase_weekday,
-    coalesce(c.state,'Unknown') AS customer_state,
-    coalesce(s.state,'Unknown') AS seller_state,
-    coalesce(i.item_count,0) AS item_count,
+    coalesce(c.state, 'Unknown') AS customer_state,
+    coalesce(s.state, 'Unknown') AS seller_state,
+    coalesce(i.item_count, 0) AS item_count,
     i.item_price, i.freight_value, i.total_weight_g,
-    coalesce(i.weight_known_items,0) AS weight_known_items,
+    coalesce(i.weight_known_items, 0) AS weight_known_items,
     i.total_volume_cm3,
-    coalesce(i.volume_known_items,0) AS volume_known_items,
+    coalesce(i.volume_known_items, 0) AS volume_known_items,
     -- Haversine great-circle distance from postal-prefix centroids, in kilometers.
     -- Broad Brazil bounds screen implausible source coordinates; it is not a
     -- state-boundary or precise country-boundary test.
@@ -84,7 +84,7 @@ JOIN dw.dim_order o USING(order_id)
 WHERE o.is_delivered = true
   AND o.purchase_timestamp IS NOT NULL
   AND o.estimated_delivery_timestamp IS NOT NULL
-  AND o.order_status NOT IN ('canceled','unavailable');
+  AND o.order_status NOT IN ('canceled', 'unavailable');
 
 -- One row per permanent buyer ID. Use the latest date IN THE DATASET as the
 -- reference date, so the historical recency measure does not drift each day.
@@ -95,7 +95,7 @@ WITH eligible_orders AS (
         o.gmv, o.latest_review_score, o.delivery_delay_days
     FROM dw.v_order_metrics o
     JOIN dw.dim_customer c USING(customer_key)
-    WHERE o.order_status NOT IN ('canceled','unavailable')
+    WHERE o.order_status NOT IN ('canceled', 'unavailable')
       AND o.purchase_timestamp IS NOT NULL
 ), reference_date AS (
     SELECT max(purchase_timestamp)::date AS as_of_date FROM eligible_orders
@@ -104,21 +104,21 @@ SELECT c.customer_unique_id, r.as_of_date,
     max(e.purchase_timestamp)::date AS last_purchase_date,
     r.as_of_date - max(e.purchase_timestamp)::date AS recency_days,
     count(DISTINCT e.order_id) AS frequency_orders,
-    coalesce(sum(e.gmv),0) AS monetary_gmv,
-    ln(1 + greatest(coalesce(sum(e.gmv),0),0)) AS log_monetary_gmv,
+    coalesce(sum(e.gmv), 0) AS monetary_gmv,
+    ln(1 + greatest(coalesce(sum(e.gmv), 0), 0)) AS log_monetary_gmv,
     avg(e.latest_review_score) AS avg_review_score,
     avg(e.delivery_delay_days) AS avg_delivery_delay_days
 FROM (SELECT DISTINCT customer_unique_id FROM dw.dim_customer
-      WHERE customer_key <> 0 AND nullif(btrim(customer_unique_id),'') IS NOT NULL) c
+      WHERE customer_key <> 0 AND nullif(btrim(customer_unique_id), '') IS NOT NULL) c
 CROSS JOIN reference_date r
 LEFT JOIN eligible_orders e USING(customer_unique_id)
 GROUP BY c.customer_unique_id, r.as_of_date;
 
 INSERT INTO meta.data_dictionary VALUES
- ('Delivery features','One row per real order. Seller state and Haversine distance use the seller with the largest item total; ties use seller key. Missing or out-of-range coordinates yield NULL distance.'),
- ('Delivery training label','label_is_late is delivered timestamp after estimated timestamp; only delivered, estimable, eligible orders are labeled. Never pass the label or delivery/review fields as predictor inputs.'),
- ('Customer recency','Days since the latest eligible purchase, measured from the latest eligible purchase date in the dataset. Customers with no eligible purchases have NULL recency.'),
- ('Customer frequency and monetary','Distinct eligible orders with a purchase timestamp, and sum of their order-level GMV. log_monetary_gmv is natural log(1 + nonnegative GMV).')
+ ('Delivery features', 'One row per real order. Seller state and Haversine distance use the seller with the largest item total; ties use seller key. Missing or out-of-range coordinates yield NULL distance.'),
+ ('Delivery training label', 'label_is_late is delivered timestamp after estimated timestamp; only delivered, estimable, eligible orders are labeled. Never pass the label or delivery/review fields as predictor inputs.'),
+ ('Customer recency', 'Days since the latest eligible purchase, measured from the latest eligible purchase date in the dataset. Customers with no eligible purchases have NULL recency.'),
+ ('Customer frequency and monetary', 'Distinct eligible orders with a purchase timestamp, and sum of their order-level GMV. log_monetary_gmv is natural log(1 + nonnegative GMV).')
 ON CONFLICT(metric_name) DO UPDATE SET definition=excluded.definition;
 
 COMMIT;

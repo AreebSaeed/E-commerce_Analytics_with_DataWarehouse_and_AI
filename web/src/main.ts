@@ -1,13 +1,46 @@
 import './style.css'
+import { bindExploration } from './explore'
 import { mountPredictor } from './prediction'
 
-type Month = { month: string; order_count: number; gmv: number; on_time_orders: number; delivered_orders: number }
-type Region = { year: number; state: string; order_count: number; gmv: number; avg_delivery_days: number | null }
-type Category = { year: number; category: string; macro_department: string; gmv: number; item_count: number }
-type Payment = { year: number; payment_type: string; amount: number }
-type Group = { label: string; count: number; cluster_id?: number }
+type Month = {
+  month: string;
+  order_count: number;
+  gmv: number;
+  on_time_orders: number;
+  delivered_orders: number
+}
+type Region = {
+  year: number;
+  state: string;
+  order_count: number;
+  gmv: number;
+  avg_delivery_days: number | null
+}
+type Category = {
+  year: number;
+  category: string;
+  macro_department: string;
+  gmv: number;
+  item_count: number
+}
+type Payment = {
+  year: number;
+  payment_type: string;
+  amount: number
+}
+type Group = {
+  label: string;
+  count: number;
+  cluster_id?: number
+}
 type Snapshot = {
-  headline: { order_count: number; gmv: number; aov: number; on_time_delivery_pct: number; avg_review_score: number }
+  headline: {
+    order_count: number;
+    gmv: number;
+    aov: number;
+    on_time_delivery_pct: number;
+    avg_review_score: number
+  }
   monthly: Month[]; regional: Region[]; categories: Category[]; payments: Payment[]
   risks: Group[]; segments: Group[]
 }
@@ -18,6 +51,8 @@ let data: Snapshot
 let page: Page = 'overview'
 let year = 'all'
 let regionSort: 'gmv' | 'order_count' = 'gmv'
+let regionState = ''
+let trendMetric: 'gmv' | 'order_count' = 'gmv'
 
 const money = (value: number) => {
   const amount = Math.abs(value)
@@ -28,9 +63,26 @@ const money = (value: number) => {
 const moneyExact = (value: number) => `R$ ${new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(value)}`
 const number = (value: number) => new Intl.NumberFormat('en-US').format(Math.round(value))
 const percent = (value: number) => `${value.toFixed(1)}%`
-const safe = (value: string) => value.replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]!)
+const safe = (value: string) => value.replace(/[&<>"']/g, char => ({
+  '&': '&amp;',
+  '<': '&lt;',
+  '>': '&gt;',
+  '"': '&quot;',
+  "'": '&#39;'
+})[char]!)
 const active = (rowYear: number) => year === 'all' || String(rowYear) === year
 const titleCase = (value: string) => value.replace(/_/g, ' ').replace(/\b\w/g, char => char.toUpperCase())
+const monthLabel = (month: string) => new Date(`${month}T00:00:00`).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+const currency = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+
+function detailMark(summary: string) {
+  const label = safe(summary)
+  return `data-detail="${label}" aria-label="${label}" aria-pressed="false"`
+}
+
+function detailLine(hint: string) {
+  return `<p class="explore-detail" data-explore-detail role="status">${hint}</p>`
+}
 
 function icon(name: string) {
   const paths: Record<string, string> = {
@@ -45,20 +97,42 @@ function icon(name: string) {
   return `<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[name]}</svg>`
 }
 
-function selectedMonths() { return data.monthly.filter(row => active(Number(row.month.slice(0, 4)))) }
+function selectedMonths() {
+  return data.monthly.filter(row => active(Number(row.month.slice(0, 4))))
+}
 function selectedRegions() {
-  const groups = new Map<string, { state: string; gmv: number; order_count: number; leadSum: number; leadCount: number }>()
+  const groups = new Map<string, {
+    state: string;
+    gmv: number;
+    order_count: number;
+    leadSum: number;
+    leadCount: number
+  }>()
   for (const row of data.regional.filter(row => active(row.year))) {
-    const found = groups.get(row.state) ?? { state: row.state, gmv: 0, order_count: 0, leadSum: 0, leadCount: 0 }
+    const found = groups.get(row.state) ?? {
+      state: row.state,
+      gmv: 0,
+      order_count: 0,
+      leadSum: 0,
+      leadCount: 0
+    }
     found.gmv += row.gmv; found.order_count += row.order_count
-    if (row.avg_delivery_days !== null) { found.leadSum += row.avg_delivery_days * row.order_count; found.leadCount += row.order_count }
+    if (row.avg_delivery_days !== null) {
+      found.leadSum += row.avg_delivery_days * row.order_count;
+      found.leadCount += row.order_count
+    }
     groups.set(row.state, found)
   }
   return [...groups.values()].map(row => ({ ...row, avg_delivery_days: row.leadCount ? row.leadSum / row.leadCount : null }))
     .sort((a, b) => b[regionSort] - a[regionSort])
 }
 function selectedCategories() {
-  const groups = new Map<string, { category: string; macro_department: string; gmv: number; item_count: number }>()
+  const groups = new Map<string, {
+    category: string;
+    macro_department: string;
+    gmv: number;
+    item_count: number
+  }>()
   for (const row of data.categories.filter(row => active(row.year))) {
     const found = groups.get(row.category) ?? { category: row.category, macro_department: row.macro_department, gmv: 0, item_count: 0 }
     found.gmv += row.gmv; found.item_count += row.item_count; groups.set(row.category, found)
@@ -92,7 +166,7 @@ function nav() {
 function topbar() {
   const years = ['all', ...new Set(data.monthly.map(item => item.month.slice(0, 4)))].sort((a, b) => a === 'all' ? -1 : b === 'all' ? 1 : Number(b) - Number(a))
   return `<header class="topbar"><div class="breadcrumb">Analytics <span>/</span> <strong>${page === 'intelligence' ? 'AI intelligence' : page === 'predict' ? 'Try prediction' : titleCase(page)}</strong></div>
-    <div class="top-actions">${page === 'intelligence' ? '<span class="snapshot-pill">All historical orders</span>' : page === 'predict' ? '<span class="snapshot-pill">Local saved model</span>' : `<div class="year-switch" role="group" aria-label="Filter by year">${years.map(item => `<button data-year="${item}" class="${year === item ? 'current' : ''}">${item === 'all' ? 'All time' : item}</button>`).join('')}</div>`}
+    <div class="top-actions">${page === 'intelligence' ? '<span class="snapshot-pill">All historical orders</span>' : page === 'predict' ? '<span class="snapshot-pill">Local saved model</span>' : `<div class="year-switch" role="group" aria-label="Filter by year">${years.map(item => `<button data-year="${item}" class="${year === item ? 'current' : ''}" aria-pressed="${year === item}">${item === 'all' ? 'All time' : item}</button>`).join('')}</div>`}
     ${page === 'predict' ? '' : `<button class="export-button" data-export title="Download the current table as CSV">${icon('download')}<span>Export CSV</span></button>`}</div></header>`
 }
 
@@ -116,18 +190,62 @@ function kpiCards() {
 function revenueChart() {
   const rows = selectedMonths()
   const width = 760, height = 230, pad = 18
-  const max = Math.max(...rows.map(row => row.gmv), 1)
-  const points = rows.map((row, index) => ({ x: pad + index * (width - 2 * pad) / Math.max(rows.length - 1, 1), y: height - pad - row.gmv / max * (height - 2 * pad), row }))
+  const revenue = trendMetric === 'gmv'
+  const format = revenue ? money : number
+  const max = Math.max(...rows.map(row => row[trendMetric]), 1)
+  const total = rows.reduce((sum, row) => sum + row[trendMetric], 0)
+  const points = rows.map((row, index) => ({
+    x: pad + index * (width - 2 * pad) / Math.max(rows.length - 1, 1),
+    y: height - pad - row[trendMetric] / max * (height - 2 * pad),
+    row
+  }))
   const line = points.map((point, index) => `${index ? 'L' : 'M'}${point.x.toFixed(1)},${point.y.toFixed(1)}`).join(' ')
   const area = `${line} L${points.at(-1)?.x ?? pad},${height} L${pad},${height} Z`
   const ticks = rows.filter((_, index) => index === 0 || index === rows.length - 1 || index % Math.max(1, Math.floor(rows.length / 5)) === 0)
-  return `<section class="panel chart-panel"><div class="panel-header"><div><span class="eyebrow">PERFORMANCE</span><h2>Revenue over time</h2></div><span class="panel-tag">Monthly GMV</span></div><div class="chart-wrap"><div class="chart-axis"><span>${money(max)}</span><span>${money(max / 2)}</span><span>R$ 0</span></div><svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Monthly gross merchandise value trend" preserveAspectRatio="none"><defs><linearGradient id="revenueFill" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stop-color="#16b8a6" stop-opacity=".26"/><stop offset="100%" stop-color="#16b8a6" stop-opacity="0"/></linearGradient></defs><path d="${area}" fill="url(#revenueFill)"/><path d="${line}" fill="none" stroke="#08a896" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>${points.map(point => `<circle cx="${point.x}" cy="${point.y}" r="5" fill="#fff" stroke="#08a896" stroke-width="2"><title>${point.row.month.slice(0, 7)} · ${moneyExact(point.row.gmv)}</title></circle>`).join('')}</svg></div><div class="chart-ticks">${ticks.map(point => `<span>${new Date(`${point.month}T00:00:00`).toLocaleDateString('en-US', { month: 'short', year: '2-digit' })}</span>`).join('')}</div><div class="chart-footer"><span><i class="legend-dot teal-dot"></i> Gross merchandise value</span><strong>${money(selectedKpis().gmv)} <small>in selected period</small></strong></div></section>`
+  const marks = points.map(({ x, y, row }) => {
+    const summary = `${monthLabel(row.month)} · R$ ${currency.format(row.gmv)} GMV · ${number(row.order_count)} orders`
+    return `<g class="trend-mark" transform="translate(${x} ${y})" role="button" tabindex="0" ${detailMark(summary)}>
+      <circle r="11" fill="transparent"/><circle class="trend-dot" r="5"/>
+    </g>`
+  }).join('')
+  const tickLabels = ticks.map(row => `<span>${new Date(`${row.month}T00:00:00`).toLocaleDateString('en-US', { month: 'short', year: '2-digit' })}</span>`).join('')
+  return `<section class="panel chart-panel" data-explore>
+    <div class="panel-header"><div><span class="eyebrow">PERFORMANCE</span><h2>${revenue ? 'Revenue' : 'Orders'} over time</h2></div>
+      <div class="year-switch trend-switch" role="group" aria-label="Trend metric">
+        <button data-trend="gmv" class="${revenue ? 'current' : ''}" aria-pressed="${revenue}">Revenue</button>
+        <button data-trend="order_count" class="${revenue ? '' : 'current'}" aria-pressed="${!revenue}">Orders</button>
+      </div>
+    </div>
+    <div class="chart-wrap">
+      <div class="chart-axis"><span>${format(max)}</span><span>${format(max / 2)}</span><span>${format(0)}</span></div>
+      <svg viewBox="0 0 ${width} ${height}" role="group" aria-label="${revenue ? 'Monthly gross merchandise value' : 'Monthly eligible orders'}" preserveAspectRatio="none">
+        <defs><linearGradient id="revenueFill" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stop-color="#16b8a6" stop-opacity=".26"/><stop offset="100%" stop-color="#16b8a6" stop-opacity="0"/></linearGradient></defs>
+        <path d="${area}" fill="url(#revenueFill)"/><path d="${line}" fill="none" stroke="#08a896" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>
+        ${marks}
+      </svg>
+    </div>
+    <div class="chart-ticks">${tickLabels}</div>
+    <div class="chart-footer"><span><i class="legend-dot teal-dot"></i> ${revenue ? 'Gross merchandise value' : 'Eligible orders'}</span><strong>${format(total)} <small>in selected period</small></strong></div>
+    ${detailLine('Select a point to see the month’s revenue and orders.')}
+  </section>`
 }
 
 function categoryPanel(full = false) {
   const items = selectedCategories().slice(0, full ? 12 : 6)
   const max = Math.max(items[0]?.gmv ?? 1, 1)
-  return `<section class="panel category-panel"><div class="panel-header"><div><span class="eyebrow">MERCHANDISING</span><h2>Top categories</h2></div><span class="panel-tag">By GMV</span></div><div class="bar-list">${items.map((item, index) => `<div class="bar-item"><div class="bar-meta"><span><em>${String(index + 1).padStart(2, '0')}</em> ${safe(titleCase(item.category))}</span><strong>${money(item.gmv)}</strong></div><div class="bar-track"><div style="width:${Math.max(3, item.gmv / max * 100)}%"></div></div></div>`).join('')}</div></section>`
+  const bars = items.map((item, index) => {
+    const label = titleCase(item.category)
+    const summary = `${label} · ${item.macro_department} · R$ ${currency.format(item.gmv)} GMV · ${number(item.item_count)} items`
+    return `<button class="bar-item" ${detailMark(summary)}>
+      <span class="bar-meta"><span><em>${String(index + 1).padStart(2, '0')}</em> ${safe(label)}</span><strong>${money(item.gmv)}</strong></span>
+      <span class="bar-track"><span style="width:${Math.max(3, item.gmv / max * 100)}%"></span></span>
+    </button>`
+  }).join('')
+  return `<section class="panel category-panel" data-explore>
+    <div class="panel-header"><div><span class="eyebrow">MERCHANDISING</span><h2>Top categories</h2></div><span class="panel-tag">By GMV</span></div>
+    <div class="bar-list">${bars}</div>
+    ${detailLine('Select a category for revenue and item counts.')}
+  </section>`
 }
 
 function paymentPanel() {
@@ -135,21 +253,59 @@ function paymentPanel() {
   const total = items.reduce((sum, item) => sum + item.amount, 0)
   const colors = ['#0fae9c', '#27465a', '#f2b66b', '#8ca9a9', '#e48f88']
   let cursor = 0
-  const stops = items.map((item, index) => { const start = cursor; cursor += total ? item.amount / total * 100 : 0; return `${colors[index % colors.length]} ${start}% ${cursor}%` }).join(', ')
-  return `<section class="panel payment-panel"><div class="panel-header"><div><span class="eyebrow">PAYMENTS</span><h2>How customers pay</h2></div><span class="panel-tag">Value share</span></div><div class="payment-body"><div class="donut" style="background:conic-gradient(${stops})" role="img" aria-label="Payment method share"><div><span>TOTAL</span><strong>${money(total)}</strong></div></div><div class="payment-legend">${items.map((item, index) => `<div><i style="background:${colors[index % colors.length]}"></i><span>${safe(titleCase(item.label))}</span><strong>${percent(total ? item.amount / total * 100 : 0)}</strong></div>`).join('')}</div></div></section>`
+  const stops = items.map((item, index) => {
+    const start = cursor;
+    cursor += total ? item.amount / total * 100 : 0;
+    return `${colors[index % colors.length]} ${start}% ${cursor}%`
+  }).join(', ')
+  const legend = items.map((item, index) => {
+    const label = titleCase(item.label)
+    const share = percent(total ? item.amount / total * 100 : 0)
+    return `<button ${detailMark(`${label} · R$ ${currency.format(item.amount)} paid · ${share} of payment value`)}>
+      <i style="background:${colors[index % colors.length]}"></i><span>${safe(label)}</span><strong>${share}</strong>
+    </button>`
+  }).join('')
+  return `<section class="panel payment-panel" data-explore>
+    <div class="panel-header"><div><span class="eyebrow">PAYMENTS</span><h2>How customers pay</h2></div><span class="panel-tag">Value share</span></div>
+    <div class="payment-body"><div class="donut" style="background:conic-gradient(${stops})" role="img" aria-label="Payment method share"><div><span>TOTAL</span><strong>${money(total)}</strong></div></div><div class="payment-legend">${legend}</div></div>
+    ${detailLine('Select a payment method for its total and share.')}
+  </section>`
+}
+
+function operationsRegions() {
+  return selectedRegions().filter(row => !regionState || row.state === regionState)
 }
 
 function regionalPanel(full = false) {
-  const items = selectedRegions().slice(0, full ? 27 : 5)
-  const max = Math.max(items[0]?.gmv ?? 1, 1)
-  return `<section class="panel region-panel"><div class="panel-header"><div><span class="eyebrow">GEOGRAPHY</span><h2>Regional performance</h2></div><button class="sort-button" data-sort="${regionSort === 'gmv' ? 'order_count' : 'gmv'}">Sort by ${regionSort === 'gmv' ? 'orders' : 'GMV'} ${icon('arrow')}</button></div><div class="region-table"><div class="region-table-head"><span>STATE</span><span>REVENUE</span><span>ORDERS</span><span>DELIVERY</span></div>${items.map(item => `<div class="region-row"><div class="state-cell"><b>${safe(item.state)}</b><span class="state-bar" style="--bar-width:${Math.max(4, item.gmv / max * 100)}%"></span></div><strong>${money(item.gmv)}</strong><span>${number(item.order_count)}</span><span>${item.avg_delivery_days === null ? '—' : `${item.avg_delivery_days.toFixed(1)}d`}</span></div>`).join('')}</div>${full ? '' : '<p class="panel-note">Showing the top five states. Open Operations for the full list.</p>'}</section>`
+  const items = full ? operationsRegions() : selectedRegions().slice(0, 5)
+  const max = Math.max(...items.map(item => item.gmv), 1)
+  const states = [...new Set(data.regional.map(row => row.state))].sort()
+  const rows = items.map(item => `<div class="region-row">
+    <div class="state-cell"><b>${safe(item.state)}</b><span class="state-bar" style="--bar-width:${Math.max(4, item.gmv / max * 100)}%"></span></div>
+    <strong title="R$ ${currency.format(item.gmv)}">${money(item.gmv)}</strong><span>${number(item.order_count)}</span>
+    <span>${item.avg_delivery_days === null ? '—' : `${item.avg_delivery_days.toFixed(1)}d`}</span>
+  </div>`).join('')
+  return `<section class="panel region-panel">
+    <div class="panel-header"><div><span class="eyebrow">GEOGRAPHY</span><h2>Regional performance</h2></div>
+      <button class="sort-button" data-sort="${regionSort === 'gmv' ? 'order_count' : 'gmv'}">Sort by ${regionSort === 'gmv' ? 'orders' : 'GMV'} ${icon('arrow')}</button>
+    </div>
+    ${full ? `<label class="region-filter">State <select data-region><option value="">All states</option>${states.map(state =>
+      `<option value="${safe(state)}" ${state === regionState ? 'selected' : ''}>${safe(state)}</option>`).join('')}</select></label>` : ''}
+    <div class="region-table"><div class="region-table-head"><span>STATE</span><span>REVENUE</span><span>ORDERS</span><span>DELIVERY</span></div>
+      ${rows || '<p class="panel-note">No regional data for this state in the selected year.</p>'}
+    </div>
+    ${full ? '' : '<p class="panel-note">Showing the top five states. Open Operations for the full list.</p>'}
+  </section>`
 }
 
 function riskPanel() {
   const order = ['Low', 'Medium', 'High']
   const colors = ['#0fae9c', '#f0ae5f', '#e58c84']
   const total = data.risks.reduce((sum, group) => sum + group.count, 0)
-  return `<section class="panel intelligence-panel"><div class="panel-header"><div><span class="eyebrow">DELIVERY MODEL</span><h2>Risk bands</h2></div><span class="panel-tag warn">Experimental model</span></div><div class="risk-grid">${order.map((label, index) => { const value = data.risks.find(group => group.label === label)?.count ?? 0; return `<div class="risk-card"><span class="risk-symbol" style="background:${colors[index]}"></span><small>${label} risk</small><strong>${number(value)}</strong><span>${percent(total ? value / total * 100 : 0)} of scored orders</span></div>` }).join('')}</div><div class="insight-note"><span>ⓘ</span><p>The late-delivery model has a held-out F1 of <strong>0.070</strong>. Use these bands to explore the data, not as reliable delivery warnings.</p></div></section>`
+  return `<section class="panel intelligence-panel"><div class="panel-header"><div><span class="eyebrow">DELIVERY MODEL</span><h2>Risk bands</h2></div><span class="panel-tag warn">Experimental model</span></div><div class="risk-grid">${order.map((label, index) => {
+    const value = data.risks.find(group => group.label === label)?.count ?? 0;
+    return `<div class="risk-card"><span class="risk-symbol" style="background:${colors[index]}"></span><small>${label} risk</small><strong>${number(value)}</strong><span>${percent(total ? value / total * 100 : 0)} of scored orders</span></div>`
+  }).join('')}</div><div class="insight-note"><span>ⓘ</span><p>The late-delivery model has a held-out F1 of <strong>0.070</strong>. Use these bands to explore the data, not as reliable delivery warnings.</p></div></section>`
 }
 
 function segmentsPanel() {
@@ -159,24 +315,70 @@ function segmentsPanel() {
 
 function operationTrend() {
   const rows = selectedMonths().filter(row => row.delivered_orders > 0)
-  return `<section class="panel ops-trend"><div class="panel-header"><div><span class="eyebrow">FULFILLMENT</span><h2>On-time delivery by month</h2></div><span class="panel-tag">Delivered orders only</span></div><div class="ops-bars">${rows.map(row => { const value = row.on_time_orders / row.delivered_orders * 100; return `<div class="ops-col" title="${row.month.slice(0, 7)} · ${percent(value)}"><div style="height:${value}%"></div></div>` }).join('')}</div><div class="ops-labels"><span>${rows[0]?.month.slice(0, 7) ?? ''}</span><span>${rows.at(-1)?.month.slice(0, 7) ?? ''}</span></div></section>`
+  const bars = rows.map(row => {
+    const value = row.on_time_orders / row.delivered_orders * 100
+    const summary = `${monthLabel(row.month)} · ${percent(value)} on time · ${number(row.on_time_orders)} of ${number(row.delivered_orders)} delivered orders`
+    return `<button class="ops-col" ${detailMark(summary)}><span style="height:${value}%"></span></button>`
+  }).join('')
+  return `<section class="panel ops-trend" data-explore>
+    <div class="panel-header"><div><span class="eyebrow">FULFILLMENT</span><h2>On-time delivery by month</h2></div><span class="panel-tag">Delivered orders only</span></div>
+    <div class="ops-bars">${bars}</div>
+    <div class="ops-labels"><span>${rows[0]?.month.slice(0, 7) ?? ''}</span><span>${rows.at(-1)?.month.slice(0, 7) ?? ''}</span></div>
+    ${detailLine('Select a month for the on-time rate and delivery counts.')}
+  </section>`
+}
+
+function pageContent() {
+  switch (page) {
+    case 'predict':
+      return '<div class="prediction-root"></div>'
+    case 'intelligence':
+      return '<div class="section-title"><div><span class="eyebrow">MODEL OUTPUTS</span><h2>Signals from the warehouse</h2></div>' +
+        '<p>Explore the predictions and behavioral groups.</p></div>' +
+        `<div class="content-grid ai-layout">${riskPanel()}${segmentsPanel()}</div>`
+    case 'operations':
+      return `${kpiCards()}<div class="content-grid ops-layout">${operationTrend()}${regionalPanel(true)}</div>`
+    case 'revenue':
+      return `${kpiCards()}<div class="content-grid">` +
+        `<div class="main-column">${revenueChart()}${categoryPanel(true)}</div>` +
+        `<div class="side-column">${paymentPanel()}</div></div>`
+    default:
+      return `${kpiCards()}<div class="content-grid">` +
+        `<div class="main-column">${revenueChart()}${regionalPanel()}</div>` +
+        `<div class="side-column">${categoryPanel()}${paymentPanel()}</div></div>`
+  }
 }
 
 function render() {
-  const content = page === 'predict'
-    ? '<div class="prediction-root"></div>'
-    : page === 'intelligence'
-    ? `<div class="section-title"><div><span class="eyebrow">MODEL OUTPUTS</span><h2>Signals from the warehouse</h2></div><p>Explore the predictions and behavioral groups.</p></div><div class="content-grid ai-layout">${riskPanel()}${segmentsPanel()}</div>`
-    : page === 'operations'
-      ? `${kpiCards()}<div class="content-grid ops-layout">${operationTrend()}${regionalPanel(true)}</div>`
-      : page === 'revenue'
-        ? `${kpiCards()}<div class="content-grid"><div class="main-column">${revenueChart()}${categoryPanel(true)}</div><div class="side-column">${paymentPanel()}</div></div>`
-        : `${kpiCards()}<div class="content-grid"><div class="main-column">${revenueChart()}${regionalPanel()}</div><div class="side-column">${categoryPanel()}${paymentPanel()}</div></div>`
+  const content = pageContent()
   app.innerHTML = `${nav()}<div class="main-shell">${topbar()}<main>${hero()}${content}<footer><span>OLIST COMMERCE STUDIO <b>·</b> HISTORICAL SNAPSHOT</span><span>Built on PostgreSQL warehouse metrics</span></footer></main></div>`
-  app.querySelectorAll<HTMLButtonElement>('[data-page]').forEach(button => button.addEventListener('click', () => { page = button.dataset.page as Page; render(); window.scrollTo(0, 0) }))
-  app.querySelectorAll<HTMLButtonElement>('[data-year]').forEach(button => button.addEventListener('click', () => { year = button.dataset.year!; render() }))
-  app.querySelector<HTMLButtonElement>('[data-sort]')?.addEventListener('click', event => { regionSort = (event.currentTarget as HTMLButtonElement).dataset.sort as typeof regionSort; render() })
+  app.querySelectorAll<HTMLButtonElement>('[data-page]').forEach(button => button.addEventListener('click', () => {
+    page = button.dataset.page as Page
+    render()
+    window.scrollTo(0, 0)
+  }))
+  app.querySelectorAll<HTMLButtonElement>('[data-year]').forEach(button => button.addEventListener('click', () => {
+    year = button.dataset.year!
+    render()
+    app.querySelector<HTMLButtonElement>('[data-year][aria-pressed="true"]')?.focus()
+  }))
+  app.querySelectorAll<HTMLButtonElement>('[data-trend]').forEach(button => button.addEventListener('click', () => {
+    trendMetric = button.dataset.trend === 'order_count' ? 'order_count' : 'gmv'
+    render()
+    app.querySelector<HTMLButtonElement>('[data-trend][aria-pressed="true"]')?.focus()
+  }))
+  app.querySelector<HTMLSelectElement>('[data-region]')?.addEventListener('change', event => {
+    regionState = (event.currentTarget as HTMLSelectElement).value
+    render()
+    app.querySelector<HTMLSelectElement>('[data-region]')?.focus()
+  })
+  app.querySelector<HTMLButtonElement>('[data-sort]')?.addEventListener('click', event => {
+    regionSort = (event.currentTarget as HTMLButtonElement).dataset.sort as typeof regionSort
+    render()
+    app.querySelector<HTMLButtonElement>('[data-sort]')?.focus()
+  })
   app.querySelector<HTMLButtonElement>('[data-export]')?.addEventListener('click', exportCurrent)
+  bindExploration(app)
   const predictionRoot = app.querySelector<HTMLElement>('.prediction-root')
   if (predictionRoot) void mountPredictor(predictionRoot)
 }
@@ -184,19 +386,25 @@ function render() {
 function exportCurrent() {
   const rows: Record<string, string | number | null>[] = page === 'intelligence'
     ? data.segments.map(row => ({ segment: row.label, customers: row.count }))
-    : page === 'operations' ? selectedRegions()
-    : page === 'revenue' ? selectedCategories() : selectedMonths()
+    : page === 'operations' ? operationsRegions()
+      : page === 'revenue' ? selectedCategories() : selectedMonths()
   if (!rows.length) return
   const headers = Object.keys(rows[0])
   const csv = [headers.join(','), ...rows.map(row => headers.map(key => `"${String(row[key] ?? '').replace(/"/g, '""')}"`).join(','))].join('\n')
   const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
-  const anchor = document.createElement('a'); anchor.href = url; anchor.download = `olist-${page}-${year}.csv`; anchor.click()
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = `olist-${page}-${year}.csv`
+  anchor.click()
   URL.revokeObjectURL(url)
 }
 
 fetch('/dashboard.json').then(response => {
   if (!response.ok) throw new Error('Dashboard snapshot unavailable')
   return response.json() as Promise<Snapshot>
-}).then(snapshot => { data = snapshot; render() }).catch(() => {
+}).then(snapshot => {
+  data = snapshot
+  render()
+}).catch(() => {
   app.innerHTML = '<div class="load-error"><h1>Dashboard data unavailable</h1><p>Run the snapshot export and reload this page.</p></div>'
 })

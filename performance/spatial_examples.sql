@@ -4,11 +4,11 @@
 EXPLAIN (ANALYZE, BUFFERS)
 SELECT count(*) AS postal_prefixes_in_box
 FROM dw.dim_geolocation
-WHERE geo_point <@ box(point(-47.0,-24.0), point(-46.0,-23.0));
+WHERE geo_point <@ box(point(-47.0, -24.0), point(-46.0, -23.0));
 
 SELECT count(*) AS postal_prefixes_in_box
 FROM dw.dim_geolocation
-WHERE geo_point <@ box(point(-47.0,-24.0), point(-46.0,-23.0));
+WHERE geo_point <@ box(point(-47.0, -24.0), point(-46.0, -23.0));
 
 -- <-> ranks candidates in planar degrees; the displayed distance uses Haversine km.
 EXPLAIN (ANALYZE, BUFFERS)
@@ -16,7 +16,7 @@ WITH candidates AS (
     SELECT zip_prefix, city, state, latitude, longitude
     FROM dw.dim_geolocation
     WHERE geo_point IS NOT NULL
-    ORDER BY geo_point <-> point(-46.6333,-23.5505)
+    ORDER BY geo_point <-> point(-46.6333, -23.5505)
     LIMIT 10
 )
 SELECT zip_prefix, city, state,
@@ -32,7 +32,7 @@ WITH candidates AS (
     SELECT zip_prefix, city, state, latitude, longitude
     FROM dw.dim_geolocation
     WHERE geo_point IS NOT NULL
-    ORDER BY geo_point <-> point(-46.6333,-23.5505)
+    ORDER BY geo_point <-> point(-46.6333, -23.5505)
     LIMIT 10
 )
 SELECT zip_prefix, city, state,

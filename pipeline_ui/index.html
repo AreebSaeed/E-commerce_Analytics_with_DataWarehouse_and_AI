@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#173d42">
+  <title>Olist Pipeline</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&amp;family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/olist-brand.css">
+  <link rel="stylesheet" href="/panel.css">
+  <script src="/panel.js" defer></script>
+</head>
+<body>
+  <header class="masthead">
+    <div class="shell masthead-inner">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+        <div><strong>olist<span>.</span></strong><small>COMMERCE STUDIO</small></div>
+      </div>
+      <span class="connection" id="connection">Connecting</span>
+    </div>
+  </header>
+  <main class="shell">
+    <section class="hero">
+      <div>
+        <h1>Warehouse pipeline</h1>
+        <p>Run each stage in order and inspect its output as it arrives.</p>
+      </div>
+      <div class="progress">
+        <div><label for="progress">Pipeline progress</label><strong id="completed">0 / 6</strong></div>
+        <progress id="progress" max="6" value="0"></progress>
+      </div>
+    </section>
+    <p class="message" id="message" role="status" hidden></p>
+    <div class="workspace">
+      <aside class="stage-panel" aria-label="Pipeline stages">
+        <h2>Stages</h2>
+        <div id="stages"></div>
+      </aside>
+      <section class="results" aria-labelledby="stage-title">
+        <div class="result-heading">
+          <h2 id="stage-title">Stage results</h2>
+          <span class="status" id="stage-status" aria-live="polite"></span>
+        </div>
+        <div id="summary"></div>
+        <a class="dashboard-link" id="dashboard" target="_blank" rel="noopener" hidden>Open commerce dashboard</a>
+        <div class="output">
+          <div class="output-heading"><h3>Process log</h3><span id="line-count"></span></div>
+          <pre id="log" tabindex="0" aria-label="Process log">Output will appear here when a stage runs.</pre>
+        </div>
+      </section>
+    </div>
+  </main>
+</body>
+</html>

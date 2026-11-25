@@ -142,7 +142,10 @@ def main():
     try:
         labeled, all_orders = read_features(engine)
         train, validation, test = chronological_split(labeled)
-        print(f"Labeled orders: train {len(train):,}, validation {len(validation):,}, test {len(test):,}", flush=True)
+        print(
+            f"Labeled orders: train {len(train):,}, validation {len(validation):,}, test {len(test):,}",
+            flush=True
+        )
         print(f"Periods: train before {validation.purchase_timestamp.min().date()}, "
               f"test from {test.purchase_timestamp.min().date()}", flush=True)
         candidates = {}
@@ -154,7 +157,10 @@ def main():
             print(f"{kind} validation: precision={result['precision']:.3f}, "
                   f"recall={result['recall']:.3f}, F1={result['f1']:.3f}, "
                   f"cutoff={threshold:.2f}", flush=True)
-        chosen = max(candidates, key=lambda name: (candidates[name][0]["f1"], candidates[name][0]["precision"]))
+        chosen = max(
+            candidates,
+            key=lambda name: (candidates[name][0]["f1"], candidates[name][0]["precision"])
+        )
         validation_result, threshold = candidates[chosen]
         # Refit on train + validation. The later test period remains untouched.
         final_model = model_pipeline(chosen)
@@ -173,13 +179,18 @@ def main():
         joblib.dump({"model": final_model, "features": FEATURES, "threshold": threshold}, model_path)
         score_count = write_scores(engine, all_orders, final_model, chosen, version, threshold,
                                    validation_result, test_result)
-        report = {"version": version, "selected_model": chosen,
-                  "feature_columns": FEATURES,
-                  "train_rows": len(train), "validation": {name: result for name, (result, _) in candidates.items()},
-                  "test": test_result, "scored_orders": score_count,
-                  "threshold": threshold,
-                  "training_cutoff": str(validation.purchase_timestamp.min()),
-                  "test_cutoff": str(test.purchase_timestamp.min())}
+        report = {
+            "version": version,
+            "selected_model": chosen,
+            "feature_columns": FEATURES,
+            "train_rows": len(train),
+            "validation": {name: result for name, (result, _) in candidates.items()},
+            "test": test_result,
+            "scored_orders": score_count,
+            "threshold": threshold,
+            "training_cutoff": str(validation.purchase_timestamp.min()),
+            "test_cutoff": str(test.purchase_timestamp.min()),
+        }
         (model_dir / f"{version}.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
         print(f"Saved {score_count:,} order scores and model {model_path.name}", flush=True)
     finally:

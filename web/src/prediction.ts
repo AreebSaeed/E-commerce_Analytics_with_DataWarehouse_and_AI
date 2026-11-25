@@ -1,9 +1,19 @@
 type ModelInfo = {
   version: string; selected_model: string; train_rows: number; validation_rows: number
-  test: { rows: number; precision: number; recall: number; f1: number }
+  test: {
+    rows: number;
+    precision: number;
+    recall: number;
+    f1: number
+  }
   threshold: number; training_cutoff: string; test_cutoff: string; states: string[]
 }
-type Prediction = { late_probability: number; predicted_late: boolean; risk_band: string; threshold: number }
+type Prediction = {
+  late_probability: number;
+  predicted_late: boolean;
+  risk_band: string;
+  threshold: number
+}
 
 const stateNames: Record<string, string> = {
   AC: 'Acre', AL: 'Alagoas', AM: 'Amazonas', AP: 'Amapá', BA: 'Bahia',
@@ -33,8 +43,8 @@ const measurementCounts = (itemCount: number): [string, string][] => [
 function form(info: ModelInfo) {
   const states = info.states.map((state): [string, string] => [state, stateNames[state] ?? state])
     .sort(([, first], [, second]) => first.localeCompare(second, 'pt-BR'))
-  const months: [string, string][] = ['January','February','March','April','May','June','July','August','September','October','November','December'].map((label, i) => [String(i + 1), label])
-  const weekdays: [string, string][] = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'].map((label, i) => [String(i + 1), label])
+  const months: [string, string][] = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'].map((label, i) => [String(i + 1), label])
+  const weekdays: [string, string][] = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((label, i) => [String(i + 1), label])
   return `<div class="predict-layout"><form class="panel predict-form" id="predict-form">
     <div class="panel-header"><div><span class="eyebrow">TRY THE TRAINED MODEL</span><h2>Order details</h2></div></div>
     <p class="predict-intro">Choose details that would be known when an order is placed.</p>
@@ -109,7 +119,9 @@ export async function mountPredictor(container: HTMLElement) {
         result.innerHTML = `<div class="result-complete ${resultClass}"><div class="result-orb">${prediction.predicted_late ? '!' : '✓'}</div><div class="result-kicker">${prediction.risk_band} RISK BAND</div><h2>${prediction.predicted_late ? 'Late delivery flagged' : 'Late delivery not flagged'}</h2><div class="result-number">${probability}%</div><p>Model score for late delivery</p><div class="result-meter"><span style="width:${probability}%"></span></div><div class="result-threshold">Decision cutoff: ${(prediction.threshold * 100).toFixed(0)}%</div></div>`
       } catch (error) {
         result.textContent = error instanceof Error ? error.message : 'Prediction failed.'
-      } finally { button.disabled = false }
+      } finally {
+        button.disabled = false
+      }
     })
   } catch {
     container.innerHTML = '<div class="panel predict-loading"><h2>Prediction server unavailable</h2><p>Build the dashboard, then start <code>python web/predict_api.py</code>. See web/README.md for the commands.</p></div>'

@@ -15,8 +15,13 @@ from sqlalchemy import text
 
 from etl import ROOT, connection_settings, database_engine
 
-FEATURES = ["recency_days", "frequency_orders", "log_monetary_gmv",
-            "avg_review_score", "avg_delivery_delay_days"]
+FEATURES = [
+    "recency_days",
+    "frequency_orders",
+    "log_monetary_gmv",
+    "avg_review_score",
+    "avg_delivery_delay_days",
+]
 SAMPLE_SIZE = 2000  # A fixed, bounded sample keeps silhouette evaluation quick.
 
 
@@ -34,13 +39,20 @@ def prepare(data):
     matrix = scaler.fit_transform(values)
     if not np.isfinite(matrix).all():
         raise ValueError("Customer features contain invalid numbers")
-    return buyers, matrix, {"median": medians, "lower": lower, "upper": upper,
-                            "scaler": scaler}
+    return buyers, matrix, {
+        "median": medians,
+        "lower": lower,
+        "upper": upper,
+        "scaler": scaler,
+    }
 
 
 def choose_clusters(matrix):
-    sample = np.random.default_rng(42).choice(len(matrix),
-        size=min(SAMPLE_SIZE, len(matrix)), replace=False)
+    sample = np.random.default_rng(42).choice(
+        len(matrix),
+        size=min(SAMPLE_SIZE, len(matrix)),
+        replace=False,
+    )
     scores = {}
     models = {}
     for k in range(2, 9):
@@ -81,9 +93,14 @@ def label_clusters(buyers):
         else:
             name = "One-time lower spend buyers"
         names[int(cluster_id)] = f"{name} (Cluster {cluster_id})"
-        profiles[int(cluster_id)] = {"customers": len(group), "label": names[int(cluster_id)],
-            **{key: None if pd.isna(value) else round(float(value), 2)
-               for key, value in med.items()}}
+        profiles[int(cluster_id)] = {
+            "customers": len(group),
+            "label": names[int(cluster_id)],
+            **{
+                key: None if pd.isna(value) else round(float(value), 2)
+                for key, value in med.items()
+            },
+        }
     return names, profiles
 
 

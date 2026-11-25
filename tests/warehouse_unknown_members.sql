@@ -6,44 +6,44 @@ TRUNCATE staging.orders, staging.order_items, staging.order_payments,
     staging.order_reviews, staging.products, staging.customers, staging.sellers,
     staging.geolocation, staging.category_translation;
 
-INSERT INTO staging.geolocation VALUES ('01234','-23.5','-46.6','test city','SP');
+INSERT INTO staging.geolocation VALUES ('01234', '-23.5', '-46.6', 'test city', 'SP');
 INSERT INTO staging.customers VALUES
-    ('customer-known','buyer-known','01234','test city','SP'),
-    ('customer-no-geo','buyer-no-geo','99999','remote city','RJ');
+    ('customer-known', 'buyer-known', '01234', 'test city', 'SP'),
+    ('customer-no-geo', 'buyer-no-geo', '99999', 'remote city', 'RJ');
 INSERT INTO staging.sellers VALUES
-    ('seller-known','01234','test city','SP'),
-    ('seller-no-geo',NULL,'remote city','RJ');
-INSERT INTO staging.products(product_id,product_category_name,product_weight_g,
-    product_length_cm,product_height_cm,product_width_cm) VALUES
-    ('product-known','beleza_saude','100','2','3','4'),
-    ('product-null',NULL,NULL,NULL,NULL,NULL),
-    ('product-blank','   ',NULL,NULL,NULL,NULL),
-    ('product-untranslated','pc_gamer',NULL,NULL,NULL,NULL),
-    ('product-new','new_unmapped_category',NULL,NULL,NULL,NULL);
-INSERT INTO staging.category_translation VALUES ('beleza_saude','health_beauty');
-INSERT INTO staging.orders(order_id,customer_id,order_status,order_purchase_timestamp,
-    order_delivered_customer_date,order_estimated_delivery_date) VALUES
-    ('order-known','customer-known','delivered','2018-01-01','2018-01-05','2018-01-06'),
-    ('order-no-customer','missing-customer','shipped','2018-01-02',NULL,'2018-01-08'),
-    ('order-no-dates','customer-no-geo','created',NULL,'',''),
-    ('order-outside-calendar',NULL,'created','2025-01-01',NULL,'2025-01-10'),
-    ('order-canceled','customer-known','canceled','2018-01-01',NULL,'2018-01-06'),
-    ('order-zero','customer-known','created','2018-02-01',NULL,'2018-02-10');
-INSERT INTO staging.order_reviews(review_id,order_id,review_score,review_creation_date) VALUES
-    ('review-old','order-known','1','2018-01-06'),('review-new','order-known','5','2018-01-07');
-INSERT INTO staging.order_items(order_id,order_item_id,product_id,seller_id,price,freight_value) VALUES
-    ('order-known','1','product-known','seller-known','10','2'),
-    ('order-known','2','product-null','seller-no-geo','20','3'),
-    ('order-no-customer','1','missing-product','missing-seller','30','4'),
-    ('orphan-a','1','product-blank','seller-known','40','5'),
-    ('orphan-b','1',NULL,NULL,'50','6'),
-    ('order-canceled','1','product-new','seller-known','60','7'),
-    ('order-zero','1','product-known','seller-known','0','0');
+    ('seller-known', '01234', 'test city', 'SP'),
+    ('seller-no-geo', NULL, 'remote city', 'RJ');
+INSERT INTO staging.products(product_id, product_category_name, product_weight_g,
+    product_length_cm, product_height_cm, product_width_cm) VALUES
+    ('product-known', 'beleza_saude', '100', '2', '3', '4'),
+    ('product-null', NULL, NULL, NULL, NULL, NULL),
+    ('product-blank', '   ', NULL, NULL, NULL, NULL),
+    ('product-untranslated', 'pc_gamer', NULL, NULL, NULL, NULL),
+    ('product-new', 'new_unmapped_category', NULL, NULL, NULL, NULL);
+INSERT INTO staging.category_translation VALUES ('beleza_saude', 'health_beauty');
+INSERT INTO staging.orders(order_id, customer_id, order_status, order_purchase_timestamp,
+    order_delivered_customer_date, order_estimated_delivery_date) VALUES
+    ('order-known', 'customer-known', 'delivered', '2018-01-01', '2018-01-05', '2018-01-06'),
+    ('order-no-customer', 'missing-customer', 'shipped', '2018-01-02', NULL, '2018-01-08'),
+    ('order-no-dates', 'customer-no-geo', 'created', NULL, '', ''),
+    ('order-outside-calendar', NULL, 'created', '2025-01-01', NULL, '2025-01-10'),
+    ('order-canceled', 'customer-known', 'canceled', '2018-01-01', NULL, '2018-01-06'),
+    ('order-zero', 'customer-known', 'created', '2018-02-01', NULL, '2018-02-10');
+INSERT INTO staging.order_reviews(review_id, order_id, review_score, review_creation_date) VALUES
+    ('review-old', 'order-known', '1', '2018-01-06'), ('review-new', 'order-known', '5', '2018-01-07');
+INSERT INTO staging.order_items(order_id, order_item_id, product_id, seller_id, price, freight_value) VALUES
+    ('order-known', '1', 'product-known', 'seller-known', '10', '2'),
+    ('order-known', '2', 'product-null', 'seller-no-geo', '20', '3'),
+    ('order-no-customer', '1', 'missing-product', 'missing-seller', '30', '4'),
+    ('orphan-a', '1', 'product-blank', 'seller-known', '40', '5'),
+    ('orphan-b', '1', NULL, NULL, '50', '6'),
+    ('order-canceled', '1', 'product-new', 'seller-known', '60', '7'),
+    ('order-zero', '1', 'product-known', 'seller-known', '0', '0');
 INSERT INTO staging.order_payments VALUES
-    ('order-known','1','credit_card','1','10'),('order-known','2','credit_card','3','5'),
-    ('order-known','3','voucher','1','20'),('order-zero','1','credit_card','1','0'),
-    ('orphan-a','1','credit_card','1','45'),('orphan-b','1','credit_card','1','56'),
-    ('order-canceled','1','credit_card','1','67');
+    ('order-known', '1', 'credit_card', '1', '10'), ('order-known', '2', 'credit_card', '3', '5'),
+    ('order-known', '3', 'voucher', '1', '20'), ('order-zero', '1', 'credit_card', '1', '0'),
+    ('orphan-a', '1', 'credit_card', '1', '45'), ('orphan-b', '1', 'credit_card', '1', '56'),
+    ('order-canceled', '1', 'credit_card', '1', '67');
 
 \ir ../sql/transform_warehouse.sql
 \ir ../sql/04_views.sql
@@ -81,17 +81,17 @@ BEGIN
     END IF;
     -- Constraints must still reject duplicate source facts and explicit NULL references.
     BEGIN
-        INSERT INTO dw.fact_order_items(source_order_id,order_item_id) VALUES ('orphan-a',1);
+        INSERT INTO dw.fact_order_items(source_order_id, order_item_id) VALUES ('orphan-a', 1);
         RAISE EXCEPTION 'Duplicate item grain was accepted';
     EXCEPTION WHEN unique_violation THEN NULL;
     END;
     BEGIN
-        INSERT INTO dw.fact_order_payments(source_order_id,payment_sequential) VALUES ('orphan-b',1);
+        INSERT INTO dw.fact_order_payments(source_order_id, payment_sequential) VALUES ('orphan-b', 1);
         RAISE EXCEPTION 'Duplicate payment grain was accepted';
     EXCEPTION WHEN unique_violation THEN NULL;
     END;
     BEGIN
-        INSERT INTO dw.dim_product(product_id,category_key) VALUES ('invalid-null-category',NULL);
+        INSERT INTO dw.dim_product(product_id, category_key) VALUES ('invalid-null-category', NULL);
         RAISE EXCEPTION 'Explicit NULL reference was accepted';
     EXCEPTION WHEN not_null_violation THEN NULL;
     END;
@@ -143,8 +143,8 @@ BEGIN
     END IF;
     IF EXISTS (SELECT 1 FROM information_schema.columns
         WHERE table_schema='dw' AND table_name='v_delivery_features'
-          AND column_name IN ('label_is_late','delivered_timestamp','estimated_delivery_timestamp',
-                              'latest_review_score','delivery_delay_days','order_status')) THEN
+          AND column_name IN ('label_is_late', 'delivered_timestamp', 'estimated_delivery_timestamp',
+                              'latest_review_score', 'delivery_delay_days', 'order_status')) THEN
         RAISE EXCEPTION 'Outcome or review leaked into prediction features';
     END IF;
     IF NOT EXISTS (SELECT 1 FROM dw.v_customer_features
@@ -159,8 +159,8 @@ BEGIN
 END $$;
 
 -- Reject a clearly incorrect coordinate without inventing a distance.
-INSERT INTO dw.dim_geolocation(zip_prefix,latitude,longitude)
-VALUES ('bad-point',42,-8);
+INSERT INTO dw.dim_geolocation(zip_prefix, latitude, longitude)
+VALUES ('bad-point', 42, -8);
 UPDATE dw.dim_customer SET geo_key=(SELECT geo_key FROM dw.dim_geolocation WHERE zip_prefix='bad-point')
 WHERE customer_id='customer-known';
 DO $$ BEGIN
@@ -175,9 +175,9 @@ WHERE customer_id='customer-known';
 -- Change an amount, refresh the stored reports, and prove they were not recreated.
 CREATE TEMP TABLE report_objects AS
 SELECT oid FROM pg_class WHERE oid IN ('dw.mv_monthly_kpis'::regclass,
-    'dw.mv_regional_metrics'::regclass,'dw.mv_category_seller_metrics'::regclass);
+    'dw.mv_regional_metrics'::regclass, 'dw.mv_category_seller_metrics'::regclass);
 UPDATE staging.order_items SET price='20' WHERE order_id='order-known' AND order_item_id='1';
-UPDATE dw.fact_order_items SET price=20,total_item_value=22
+UPDATE dw.fact_order_items SET price=20, total_item_value=22
 WHERE source_order_id='order-known' AND order_item_id=1;
 \ir ../sql/06_refresh_views.sql
 DO $$

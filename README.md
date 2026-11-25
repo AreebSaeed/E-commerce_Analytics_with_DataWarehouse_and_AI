@@ -12,9 +12,11 @@ For a fresh local setup, install PostgreSQL (including `psql`), Python 3.12, and
 python run_project.py
 ```
 
-If the project virtual environment already exists, run `.\.venv\Scripts\python.exe run_project.py`. The driver reuses installed dependencies and installs any missing ones. It rebuilds and validates the warehouse, trains both models, exports the dashboard data, builds the frontend, and starts the local server. Open `http://127.0.0.1:8000/` when the server starts. Press `Ctrl+C` to stop it.
+If the project virtual environment already exists, run `.\.venv\Scripts\python.exe run_project.py`. The command opens the pipeline control panel at `http://127.0.0.1:8765/`. Click **Run** beside each stage as it becomes ready. The panel displays live logs, warehouse row counts, model results, and build output. Use **Open commerce dashboard** after starting the final stage. Keep the terminal open while using either page. Press `Ctrl+C` in the terminal to stop the control panel and any process it started.
 
-To run the same stages individually:
+Use `python run_project.py --all` to run every stage automatically in the terminal. Both modes reuse the installed dependencies and install missing ones as needed.
+
+To run the same stages directly:
 
 ```powershell
 python -m venv .venv

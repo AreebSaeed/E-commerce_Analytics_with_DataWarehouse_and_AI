@@ -1,0 +1,38 @@
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 0 15px;
+}
+
+.brand strong {
+  display: block;
+  font-family: Manrope, sans-serif;
+  font-size: 25px;
+  line-height: 1;
+  letter-spacing: -1.6px;
+}
+
+.brand strong span { color: #62dbbd; }
+
+.brand small {
+  display: block;
+  margin-top: 6px;
+  color: #b2cfca;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 2.5px;
+}
+
+.brand-mark {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 3px;
+  width: 31px;
+  height: 31px;
+  transform: rotate(-15deg);
+}
+
+.brand-mark span { background: #54d9b6; border-radius: 4px; }
+.brand-mark span:nth-child(2) { opacity: .55; }
+.brand-mark span:nth-child(3) { opacity: .75; }

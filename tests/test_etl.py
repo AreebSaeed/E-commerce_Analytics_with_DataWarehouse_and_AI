@@ -12,7 +12,11 @@ class EtlTests(unittest.TestCase):
     def test_csv_keeps_postal_zeros_and_literal_text(self):
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / "sample.csv"
-            path.write_text('zip,comment,empty\n01234,"Sao Paulo, café\nsecond line",\n00001,NA,\n', encoding="utf-8", newline="")
+            path.write_text(
+                'zip,comment,empty\n01234,"Sao Paulo, café\nsecond line",\n00001,NA,\n',
+                encoding="utf-8",
+                newline=""
+            )
             with etl.read_chunks(path) as chunks:
                 data = next(chunks)
             self.assertEqual(data["zip"].tolist(), ["01234", "00001"])
@@ -23,7 +27,10 @@ class EtlTests(unittest.TestCase):
     def test_env_is_literal_and_cli_overrides_it(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
-            (root / ".env").write_text('PGDATABASE=from_file\nPGPASSWORD="p@ss:$word#123"\n', encoding="utf-8")
+            (root / ".env").write_text(
+                'PGDATABASE=from_file\nPGPASSWORD="p@ss:$word#123"\n',
+                encoding="utf-8"
+            )
             args = argparse.Namespace(host=None, port=None, database="from_cli", user=None)
             with patch.object(etl, "ROOT", root), patch.dict(etl.os.environ, {}, clear=True):
                 settings = etl.connection_settings(args)

@@ -68,7 +68,10 @@ export class Visual implements IVisual {
     private readonly status = document.createElement("div");
     private readonly deltaFormat: Intl.NumberFormat;
     private settings = new VisualSettings();
-    private selectableCards: { element: HTMLButtonElement; identity: ISelectionId }[] = [];
+    private selectableCards: {
+        element: HTMLButtonElement;
+        identity: ISelectionId
+    }[] = [];
 
     constructor(options?: VisualConstructorOptions) {
         if (!options) {
@@ -277,7 +280,12 @@ export class Visual implements IVisual {
         const coordinates = "clientX" in position
             ? [position.clientX, position.clientY]
             : [position.left + position.width / 2, position.bottom];
-        service.show({ coordinates, isTouchEvent: false, dataItems: card.tooltip, identities: card.selectionId ? [card.selectionId] : [] });
+        service.show({
+            coordinates,
+            isTouchEvent: false,
+            dataItems: card.tooltip,
+            identities: card.selectionId ? [card.selectionId] : []
+        });
     }
 
     private moveTooltip(card: Card, event: PointerEvent): void {

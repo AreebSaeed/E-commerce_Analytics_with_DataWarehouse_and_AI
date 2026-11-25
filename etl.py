@@ -46,7 +46,13 @@ REFERENCES = {
 
 
 def connection_settings(args):
-    settings = {"PGHOST": "localhost", "PGPORT": "5432", "PGDATABASE": "olist_dw", "PGUSER": "postgres", "PGPASSWORD": ""}
+    settings = {
+        "PGHOST": "localhost",
+        "PGPORT": "5432",
+        "PGDATABASE": "olist_dw",
+        "PGUSER": "postgres",
+        "PGPASSWORD": ""
+    }
     for key in settings:
         settings[key] = os.environ.get(key, settings[key])
     env_file = ROOT / ".env"
@@ -58,7 +64,12 @@ def connection_settings(args):
                 value = value[1:-1]
             if separator and key.strip() in settings and value:
                 settings[key.strip()] = value
-    for option, key in (("host", "PGHOST"), ("port", "PGPORT"), ("database", "PGDATABASE"), ("user", "PGUSER")):
+    for option, key in (
+        ("host", "PGHOST"),
+        ("port", "PGPORT"),
+        ("database", "PGDATABASE"),
+        ("user", "PGUSER")
+    ):
         value = getattr(args, option)
         if value is not None:
             settings[key] = str(value)
@@ -72,14 +83,21 @@ def database_engine(settings, database=None):
     url = URL.create("postgresql+psycopg2", username=settings["PGUSER"],
         password=settings["PGPASSWORD"], host=settings["PGHOST"],
         port=int(settings["PGPORT"]), database=database or settings["PGDATABASE"])
-    return create_engine(url, connect_args={"connect_timeout": 10, "client_encoding": "UTF8"}, hide_parameters=True)
+    return create_engine(
+        url,
+        connect_args={"connect_timeout": 10, "client_encoding": "UTF8"},
+        hide_parameters=True
+    )
 
 
 def ensure_database(settings):
     admin = database_engine(settings, "postgres")
     try:
         with admin.connect().execution_options(isolation_level="AUTOCOMMIT") as connection:
-            exists = connection.scalar(text("SELECT 1 FROM pg_database WHERE datname=:name"), {"name": settings["PGDATABASE"]})
+            exists = connection.scalar(
+                text("SELECT 1 FROM pg_database WHERE datname=:name"),
+                {"name": settings["PGDATABASE"]}
+            )
             if not exists:
                 name = admin.dialect.identifier_preparer.quote(settings["PGDATABASE"])
                 connection.exec_driver_sql(f"CREATE DATABASE {name}")
@@ -90,14 +108,25 @@ def ensure_database(settings):
 def run_sql(filename, settings):
     psql = shutil.which("psql") or str(Path(os.environ.get("ProgramFiles", "C:/Program Files")) / "PostgreSQL/18/bin/psql.exe")
     environment = {**os.environ, **settings, "PGCLIENTENCODING": "UTF8", "PGCONNECT_TIMEOUT": "10"}
-    result = subprocess.run([psql, "-X", "-w", "-v", "ON_ERROR_STOP=1", "-f", str(ROOT / "sql" / filename)],
+    result = subprocess.run([
+        psql,
+        "-X",
+        "-w",
+        "-v",
+        "ON_ERROR_STOP=1",
+        "-f",
+        str(ROOT / "sql" / filename)
+    ],
         cwd=ROOT, env=environment, capture_output=True, text=True, encoding="utf-8", errors="replace")
     if result.returncode:
         raise RuntimeError(f"{filename}: {result.stderr.strip()}")
 
 
 def check_files(data_dir):
-    missing = [name for table, name in FILES.items() if table != "geolocation" and not (data_dir / name).is_file()]
+    missing = [
+        name for table,
+        name in FILES.items() if table != "geolocation" and not (data_dir / name).is_file()
+    ]
     if missing:
         raise FileNotFoundError("Missing required CSVs: " + ", ".join(missing))
 
@@ -127,7 +156,10 @@ def load_csvs(engine, data_dir):
                         buffer = io.StringIO()
                         chunk.to_csv(buffer, index=False, header=False, lineterminator="\n")
                         buffer.seek(0)
-                        cursor.copy_expert(f"COPY staging.{table} FROM STDIN WITH (FORMAT CSV, ENCODING 'UTF8')", buffer)
+                        cursor.copy_expert(
+                            f"COPY staging.{table} FROM STDIN WITH (FORMAT CSV, ENCODING 'UTF8')",
+                            buffer
+                        )
                         row_count += len(chunk)
                 print(f"  {table}: {row_count:,} rows", flush=True)
         finally:

@@ -17,6 +17,8 @@ cd ..
 
 Open **http://127.0.0.1:8000/** and choose **Try prediction**. The Python server serves the built TypeScript dashboard and runs the saved model locally. It binds to your computer only.
 
+Use **Revenue** or **Orders** above the trend chart to switch metrics. Hover over or focus a chart mark to preview its details, or select it to keep the details visible. Select it again or press **Escape** to clear it. On **Operations**, the state filter applies to the regional table and CSV export.
+
 For TypeScript development, keep the Python server running and start `npm.cmd run dev` in a second PowerShell window from `web`. Vite proxies `/api` requests to the local Python server.
 
 The dashboard reads `web/public/dashboard.json`, an aggregate snapshot generated from warehouse views and ML result tables. It does not connect directly to PostgreSQL from the browser. Refresh the snapshot and rebuild after data changes.
