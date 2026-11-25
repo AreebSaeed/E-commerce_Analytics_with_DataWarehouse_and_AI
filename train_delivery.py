@@ -13,7 +13,7 @@ from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.impute import SimpleImputer
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import confusion_matrix, precision_recall_fscore_support
+from sklearn.metrics import average_precision_score, confusion_matrix, precision_recall_fscore_support
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sqlalchemy import text
@@ -26,7 +26,11 @@ NUMERIC = ["purchase_month", "purchase_weekday", "item_count", "item_price",
            "total_volume_cm3", "volume_known_items", "seller_customer_distance_km"]
 CATEGORICAL = ["customer_state", "seller_state"]
 FEATURES = NUMERIC + CATEGORICAL
-THRESHOLDS = np.arange(0.10, 0.91, 0.05)
+THRESHOLDS = np.arange(0.05, 0.95, 0.025)
+MODEL_CONFIGS = {
+    "logistic_regression": {"negative_ratio": 3.0, "class_power": 0.7},
+    "random_forest": {"negative_ratio": None, "class_power": 0.5},
+}
 
 
 def read_features(engine):
@@ -63,6 +67,36 @@ def chronological_split(labeled):
     return train, validation, test
 
 
+def balance_training_data(data, negative_ratio=None, random_state=42):
+    """Keep all positive late orders and downsample majority orders if ratio is set."""
+    if negative_ratio is None:
+        return data
+    labels = data.label_is_late.astype(int).to_numpy()
+    pos_idx = np.where(labels == 1)[0]
+    neg_idx = np.where(labels == 0)[0]
+    target_neg = int(len(pos_idx) * negative_ratio)
+    if not len(pos_idx) or target_neg >= len(neg_idx):
+        return data
+    rng = np.random.default_rng(random_state)
+    sampled_neg = rng.choice(neg_idx, size=max(1, target_neg), replace=False)
+    keep_idx = np.sort(np.concatenate([pos_idx, sampled_neg]))
+    return data.iloc[keep_idx].reset_index(drop=True)
+
+
+def compute_sample_weights(labels, class_power=0.5, recency_min=0.5, recency_max=1.5):
+    """Compute normalized class-balanced and temporally recency-weighted sample weights."""
+    y = np.asarray(labels, dtype=int)
+    pos_count = int((y == 1).sum())
+    neg_count = int((y == 0).sum())
+    if pos_count == 0 or neg_count == 0:
+        return np.ones(len(y), dtype=float)
+    pos_weight = float((neg_count / pos_count) ** class_power)
+    class_weights = np.where(y == 1, pos_weight, 1.0)
+    recency_weights = np.linspace(recency_min, recency_max, len(y))
+    combined = class_weights * recency_weights
+    return combined / combined.mean()
+
+
 def model_pipeline(kind):
     numeric = Pipeline([("fill", SimpleImputer(strategy="median", keep_empty_features=True)),
                         ("scale", StandardScaler())])
@@ -71,27 +105,47 @@ def model_pipeline(kind):
     preprocess = ColumnTransformer([("numbers", numeric, NUMERIC),
                                     ("states", category, CATEGORICAL)])
     if kind == "random_forest":
-        classifier = RandomForestClassifier(n_estimators=100, max_depth=12,
-            min_samples_leaf=5, class_weight="balanced", random_state=42, n_jobs=-1)
+        classifier = RandomForestClassifier(n_estimators=200, max_depth=14,
+            min_samples_leaf=12, random_state=42, n_jobs=-1)
     else:
-        classifier = LogisticRegression(max_iter=500, class_weight="balanced", random_state=42)
+        classifier = LogisticRegression(max_iter=1000, C=0.25, random_state=42)
     return Pipeline([("preprocess", preprocess), ("classifier", classifier)])
+
+
+def fit_weighted_model(kind, data):
+    """Apply class balancing and weighted loss, then fit the requested pipeline."""
+    cfg = MODEL_CONFIGS[kind]
+    balanced = balance_training_data(data, negative_ratio=cfg["negative_ratio"])
+    y = balanced.label_is_late.astype(int)
+    sample_weight = compute_sample_weights(y, class_power=cfg["class_power"])
+    model = model_pipeline(kind)
+    model.fit(balanced[FEATURES], y, classifier__sample_weight=sample_weight)
+    return model
+
+
+def evaluate_probabilities(actual, probability, threshold):
+    """Compute binary classification metrics from precomputed probabilities."""
+    predicted = (probability >= threshold).astype(int)
+    precision, recall, f1, _ = precision_recall_fscore_support(
+        actual, predicted, average="binary", zero_division=0)
+    tn, fp, fn, tp = confusion_matrix(actual, predicted, labels=[0, 1]).ravel()
+    ap = average_precision_score(actual, probability) if len(np.unique(actual)) == 2 else 0.0
+    return {"rows": len(actual), "late_rows": int(actual.sum()),
+            "precision": float(precision), "recall": float(recall), "f1": float(f1),
+            "average_precision": float(ap),
+            "tn": int(tn), "fp": int(fp), "fn": int(fn), "tp": int(tp)}
 
 
 def evaluate(model, data, threshold):
     actual = data.label_is_late.astype(int)
     probability = model.predict_proba(data[FEATURES])[:, 1]
-    predicted = (probability >= threshold).astype(int)
-    precision, recall, f1, _ = precision_recall_fscore_support(
-        actual, predicted, average="binary", zero_division=0)
-    tn, fp, fn, tp = confusion_matrix(actual, predicted, labels=[0, 1]).ravel()
-    return {"rows": len(data), "late_rows": int(actual.sum()),
-            "precision": float(precision), "recall": float(recall), "f1": float(f1),
-            "tn": int(tn), "fp": int(fp), "fn": int(fn), "tp": int(tp)}
+    return evaluate_probabilities(actual, probability, threshold)
 
 
 def choose_threshold(model, validation):
-    results = [(evaluate(model, validation, float(threshold)), float(threshold))
+    actual = validation.label_is_late.astype(int)
+    probability = model.predict_proba(validation[FEATURES])[:, 1]
+    results = [(evaluate_probabilities(actual, probability, float(threshold)), float(threshold))
                for threshold in THRESHOLDS]
     return max(results, key=lambda pair: (pair[0]["f1"], pair[0]["precision"]))
 
@@ -124,7 +178,7 @@ def write_scores(engine, all_orders, model, kind, version, threshold, validation
         for split, metrics in (("validation", validation), ("test", test)):
             notes = json.dumps({"model_version": version, "split": split,
                                 "decision_threshold": threshold})
-            for name in ("precision", "recall", "f1", "tn", "fp", "fn", "tp"):
+            for name in ("precision", "recall", "f1", "average_precision", "tn", "fp", "fn", "tp"):
                 connection.execute(text("INSERT INTO meta.ml_runs "
                     "(model_name,sample_size,metric_name,metric_value,notes) "
                     "VALUES (:model,:sample,:name,:value,:notes)"),
@@ -150,25 +204,24 @@ def main():
               f"test from {test.purchase_timestamp.min().date()}", flush=True)
         candidates = {}
         for kind in ("logistic_regression", "random_forest"):
-            model = model_pipeline(kind)
-            model.fit(train[FEATURES], train.label_is_late.astype(int))
+            model = fit_weighted_model(kind, train)
             result, threshold = choose_threshold(model, validation)
             candidates[kind] = (result, threshold)
             print(f"{kind} validation: precision={result['precision']:.3f}, "
                   f"recall={result['recall']:.3f}, F1={result['f1']:.3f}, "
-                  f"cutoff={threshold:.2f}", flush=True)
+                  f"AP={result['average_precision']:.3f}, cutoff={threshold:.3f}", flush=True)
         chosen = max(
             candidates,
             key=lambda name: (candidates[name][0]["f1"], candidates[name][0]["precision"])
         )
         validation_result, threshold = candidates[chosen]
         # Refit on train + validation. The later test period remains untouched.
-        final_model = model_pipeline(chosen)
         train_and_validation = pd.concat((train, validation), ignore_index=True)
-        final_model.fit(train_and_validation[FEATURES], train_and_validation.label_is_late.astype(int))
+        final_model = fit_weighted_model(chosen, train_and_validation)
         test_result = evaluate(final_model, test, threshold)
         print(f"Selected {chosen}; held-out test: precision={test_result['precision']:.3f}, "
-              f"recall={test_result['recall']:.3f}, F1={test_result['f1']:.3f}", flush=True)
+              f"recall={test_result['recall']:.3f}, F1={test_result['f1']:.3f}, "
+              f"AP={test_result['average_precision']:.3f}", flush=True)
         print(f"Confusion matrix: TN={test_result['tn']}, FP={test_result['fp']}, "
               f"FN={test_result['fn']}, TP={test_result['tp']}", flush=True)
 
